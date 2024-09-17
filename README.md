@@ -20,6 +20,10 @@ home network, and there is no user validation for the REST APIs.
 PixelGW is primarily built and run as a docker image.
 You will need Docker installed and configured with your user in the docker group.
 
+After initially cloning this repository, get the submodules:
+
+    $ git submodule init && git submodule update
+
 To rebuild the generated REST bindings after editing pixelgw.yaml:
 
     $ make generate
