@@ -1,0 +1,3 @@
+[submodule "apps/community"]
+	path = apps/community
+	url = https://github.com/tidbyt/community.git

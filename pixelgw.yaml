@@ -1,0 +1,548 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Pixel Gateway
+  description: API to manage PixelMatrix servier and displays
+servers:
+  - url: http://localhost:8080/api
+paths:
+  /applets:
+    get:
+      summary: List available apps
+      description: Return all the configured apps
+      operationId: getApplets
+      parameters:
+        - name: id
+          in: query
+          description: Id to filter by
+          schema:
+            type: string
+      responses:
+        '200':
+          description: App response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/App'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /applets/{id}:
+    get:
+      summary: Get the details of an app
+      description: Returns an app by id
+      operationId: getAppletByID
+      parameters:
+        - name: id
+          in: path
+          description: ID of the app to fetch
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: app response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/App'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /channels:
+    get:
+      description: Returns the list of channels.
+      operationId: getChannels
+      responses:
+        '200':
+          description: Channel response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChannelSummary'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    post:
+      description: Create a new channel
+      operationId: createChannel
+      requestBody:
+        description: New channel
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelSummary'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelDetail'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /channels/{uuid}:
+    get:
+      description: Get the details of a channel
+      operationId: findChannelByUUID
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the channel to fetch
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Channel response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelDetail'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /channels/{channelUUID}/applets:
+    post:
+      description: Create a new applet instance
+      operationId: createChannelApplet
+      parameters:
+        - name: channelUUID
+          in: path
+          description: UUID of the channel
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Applet
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppInstanceSummary'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppInstanceDetail'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /channels/{channelUUID}/applets/{appletUUID}:
+    delete:
+      description: Delete an applet instance
+      operationId: deleteChannelApplet
+      parameters:
+        - name: channelUUID
+          in: path
+          description: UUID of the channel
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: appletUUID
+          in: path
+          description: UUID of the applet instance
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ok
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    patch:
+      description: Modify an applet instance
+      operationId: patchChannelApplet
+      parameters:
+        - name: channelUUID
+          in: path
+          description: UUID of the channel
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: appletUUID
+          in: path
+          description: UUID of the applet instance
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Channel attributes
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                idx:
+                  type: integer
+                  description: App position
+                config:
+                  type: string
+                  format: json
+                  description: Applet configuration
+      responses:
+        '200':
+          description: Ok
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /devices:
+    get:
+      summary: Get configured devices
+      operationId: getDevices
+      responses:
+        '200':
+          description: Device response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceSummary'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /devices/{uuid}:
+    get:
+      description: Get the details of a device
+      operationId: getDeviceByUUID
+      parameters:
+        - name: uuid
+          in: path
+          description: ID of the device
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Device response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSummary'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    patch:
+      description: Modify a device
+      operationId: patchDevice
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the device
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        description: Device attributes
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Device name
+                channel:
+                  $ref: '#/components/schemas/ChannelRef'
+      responses:
+        '200':
+          description: Ok
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /sessions:
+    get:
+      summary: Get connected sessions
+      operationId: getSessions
+      responses:
+        '200':
+          description: Session response
+          content:
+           application/json:
+             schema:
+               type: array
+               items:
+                 $ref: '#/components/schemas/SessionSummary'
+        default: 
+          $ref: '#/components/responses/DefaultErrorResponse'
+components:
+  schemas:
+    App:
+      type: object
+      required:
+        - id
+        - name
+        - summary
+        - description
+        - author
+      properties:
+        id:
+          type: string
+          description: Unique ID of the app
+        name:
+          type: string
+          description: Name of the app
+        summary:
+          type: string
+          description: Short summary of the app
+        description:
+          type: string
+          desciption: Long form of what this applet does
+        author:
+          type: string
+          description: Author of the app
+        schema:
+           $ref: '#/components/schemas/Schema'
+    AppInstanceSummary:
+      type: object
+      properties:
+        app-id:
+          type: string
+          description: Applet ID
+          x-go-name: AppID
+        idx:
+          type: integer
+          description: App position
+        config:
+          type: string
+          format: json
+          description: Applet configuration
+      required:
+        - app-id
+    AppInstanceDetail:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/AppInstanceSummary'
+        - properties:
+            uuid:
+              type: string
+              format: uuid
+              x-go-name: UUID
+              description: App instance UUID
+    ChannelRef:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: UUID of the channel
+          x-go-name: UUID
+        name:
+          type: string
+          description: Name of the channel
+    ChannelSummary:
+      type: object
+      required:
+        - name
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: UUID of the channel
+          x-go-name: UUID
+          readOnly: true
+        name:
+          type: string
+          description: Name of the channel
+        comment:
+          type: string
+          description: Comment for the channel
+    ChannelDetail:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ChannelSummary'
+        - properties:
+            applets:
+              type: array
+              items:
+               $ref: '#/components/schemas/AppInstanceDetail'
+            subscribers:
+              type: array
+              items:
+                $ref: '#/components/schemas/DeviceRef'
+    DeviceRef:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: UUID of the device
+          x-go-name: UUID
+        name:
+          type: string
+          description: Name of the channel
+    DeviceSummary:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/DeviceRef'
+        - properties:
+            channel:
+              $ref: '#/components/schemas/ChannelRef'
+    SessionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: uint32
+          description: Session ID
+          x-go-name: ID
+        client-uuid:
+          type: string
+          format: uuid
+          description: Client UUID
+          x-go-name: ClientUUID
+        remote-addr:
+          type: string
+          description: Remote IP address
+          x-ogen-name: RemoteAddr
+        channel:
+          $ref: '#/components/schemas/ChannelRef'
+    Schema:
+      type: object
+      x-go-type: schema.Schema
+      x-go-type-import:
+        name: schema
+        path: tidbyt.dev/pixlet/schema
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          description: Version
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaField'
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    SchemaField:
+      type: object
+      x-go-type: schema.SchemaField
+      x-go-type-import:
+        name: schema
+        path: tidbyt.dev/pixlet/schema
+      properties:
+        type:
+          type: string
+          description: type
+        id:
+          type: string
+          description: id
+        name:
+          type: string
+          description: name
+        icon:
+          type: string
+          description: icon
+        visibility:
+          $ref: '#/components/schemas/SchemaVisibility'
+        default:
+          type: string
+          description: default value
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaOption'
+    SchemaVisibility:
+      type: object
+      x-go-type: schema.SchemaVisibility
+      x-go-type-import:
+        name: schema
+        path: tidbyt.dev/pixlet/schema
+      required:
+        - type
+        - condition
+        - variable
+      properties:
+        type:
+          type: string
+          description: type
+        condition:
+          type: string
+          description: condition
+        variable:
+          type: string
+          description: variable
+        value:
+          type: string
+          description: value
+    SchemaOption:
+      type: object
+      x-go-type: schema.SchemaOption
+      x-go-type-import:
+        name: schema
+        path: tidbyt.dev/pixlet/schema
+      required:
+        - text
+        - value
+      properties:
+        display:
+          type: string
+          description: display
+        text:
+          type: string
+          description: the same as display
+        value:
+          type: string
+          description: value
+    Notification:
+      type: object
+      x-go-type: schema.Notification
+      x-go-type-import:
+        name: schema
+        path: tidbyt.dev/pixlet/schema
+      allOf:
+       - $ref: '#/components/schemas/SchemaField'
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Error code
+        message:
+          type: string
+          description: Error message
+  responses:
+    DefaultErrorResponse:
+      description: Unknown error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+

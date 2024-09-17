@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ${IMAGE}
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT}:8080"
+    volumes:
+      - pixel-config:/app/etc
+
+volumes:
+  pixel-config: {}
