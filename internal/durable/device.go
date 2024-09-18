@@ -57,7 +57,7 @@ func (store *Store) ModifyDevice(ctx context.Context, device *Device) error {
 			`UPDATE devices
 			      SET name = $Device.name,
 				      channel_uuid = $Device.channel_uuid
-				WHERE id = $Device.id`,
+				WHERE uuid = $Device.uuid`,
 			Device{})
 		err := tx.Query(stmt, device).Run()
 		if err != nil {
