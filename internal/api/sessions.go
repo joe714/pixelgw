@@ -11,10 +11,13 @@ func (s *Server) GetSessions(ctx context.Context, request GetSessionsRequestObje
 		resp = append(resp, SessionSummary{
 			ID:         &s.SessionID,
 			RemoteAddr: &s.RemoteAddr,
-			ClientUUID: &s.ClientUUID,
 			Channel: &ChannelRef{
 				UUID: &s.ChannelUUID,
 				Name: &s.ChannelName,
+			},
+			// TODO: Add device name here too
+			Device: &DeviceRef{
+				UUID: &s.DeviceUUID,
 			},
 		})
 	}

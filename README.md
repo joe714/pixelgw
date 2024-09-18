@@ -1,8 +1,12 @@
 PixelGW, a self-hosted Pixlet server for low-resolution devices.
 
+Maintainer: Joe Sunday sunday@csh.rit.edu
+GitHub: https://github.com/joe714/pixelgw
+
 # Operation
 PixelGW runs [Pixlet](https://github.com/tidbyt/pixlet) apps and serves them
-to one or more devices over Websockets.
+to one or more devices over Websockets. See https://github.com/joe714/pixelclient
+for the device firmware.
 
 The server configures one or more channels, which is a list of apps and
 subscribed devices. By default, new devices will register against the

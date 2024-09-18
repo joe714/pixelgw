@@ -416,17 +416,14 @@ components:
           format: uint32
           description: Session ID
           x-go-name: ID
-        client-uuid:
-          type: string
-          format: uuid
-          description: Client UUID
-          x-go-name: ClientUUID
         remote-addr:
           type: string
           description: Remote IP address
           x-ogen-name: RemoteAddr
         channel:
           $ref: '#/components/schemas/ChannelRef'
+        device:
+          $ref: '#/components/schemas/DeviceRef'
     Schema:
       type: object
       x-go-type: schema.Schema

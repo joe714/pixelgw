@@ -17,7 +17,7 @@ import (
 
 type SessionInfo struct {
 	SessionID   uint32
-	ClientUUID  uuid.UUID
+	DeviceUUID  uuid.UUID
 	RemoteAddr  string
 	ChannelUUID uuid.UUID
 	ChannelName string
@@ -192,15 +192,15 @@ func (h *Hub) SubscribeDevice(deviceUUID uuid.UUID, channelUUID uuid.UUID) error
 //	}
 //
 //	defer file.Close()
-//	clientId := r.FormValue("clientId")
+//	deviceUUID := r.FormValue("device")
 //	data, err := ioutil.ReadAll(file)
-//	log.Printf("%v: upload for %v %v", host, clientId, len(data))
+//	log.Printf("%v: upload for %v %v", host, deviceUUID, len(data))
 //	if err != nil {
 //		log.Printf("%v upload read failed: %v", host, err)
 //		return
 //	}
 //
-//	msg := &BroadcastMsg{clientId: clientId, ttl: 15 * time.Second, data: data}
+//	msg := &BroadcastMsg{deviceUUID: deviceUUID, ttl: 15 * time.Second, data: data}
 //	h.broadcast <- msg
 //}
 
@@ -208,10 +208,6 @@ func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	q := r.URL.Query()
 	id := q.Get("device")
-	if len(id) == 0 {
-		// Fallback for older firmare
-		id = q.Get("clientId")
-	}
 
 	if len(id) == 0 {
 		log.Printf("%v: No device UUID specified", host)
@@ -252,7 +248,7 @@ func (h *Hub) GetSessions() []SessionInfo {
 			addr, _, _ := net.SplitHostPort(k.RemoteAddr().String())
 			resp = append(resp, SessionInfo{
 				SessionID:   k.SessionID,
-				ClientUUID:  k.UUID,
+				DeviceUUID:  k.UUID,
 				RemoteAddr:  addr,
 				ChannelUUID: v.UUID,
 				ChannelName: v.Name,
