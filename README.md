@@ -36,10 +36,10 @@ To build the docker image:
 
     $ make
 
-There are two default deploy targets: *deploy_prod* will listen on port 8080,
-*deploy_test* will listen on 8081:
-
-    $ make deploy_prod
+There are two default deploy targets:
+- *make deploy_prod* will deploy the single complete production image on port 8080.
+- *make deploy_test* will deploy the server image as well as live node image running
+  the web UI from the source tree with HMR enabled on port 8081.
 
 # Applets
 Applets are built into the docker image from the contents of the /apps directories:

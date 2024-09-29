@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -10,9 +12,21 @@ import (
 	"tidbyt.dev/pixlet/runtime"
 )
 
+type fallbackFS struct {
+	fs http.FileSystem
+}
+
+func (d fallbackFS) Open(path string) (http.File, error) {
+	f, err := d.fs.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		f, err = d.fs.Open("/index.html")
+	}
+	return f, err
+}
+
 func main() {
 	runtime.InitCache(runtime.NewInMemoryCache())
-	fs := http.FileServer(http.Dir("./static"))
+	fs := http.FileServer(fallbackFS{fs: http.Dir("./static")})
 
 	store, err := durable.NewStore()
 	if err != nil {

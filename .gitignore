@@ -1,3 +1,4 @@
 # Ignore vim recovery files
 .*.swp
 .cache
+.npm

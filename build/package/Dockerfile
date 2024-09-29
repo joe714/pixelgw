@@ -30,7 +30,7 @@ RUN apt-get update \
                           libwebpdemux2 \
                           libwebpmux3
 
-COPY web/static ./static
+COPY web/dist ./static
 COPY apps/community/apps ./apps
 COPY apps/local/ ./apps
 COPY --from=stage2 /go/src/bin/pixelgw ./bin/pixelgw

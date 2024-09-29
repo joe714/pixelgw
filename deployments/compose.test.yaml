@@ -1,0 +1,20 @@
+services:
+  app:
+    image: ${IMAGE}
+    restart: unless-stopped
+    volumes:
+      - pixel-config:/app/etc
+  ui:
+    image: node:22-alpine
+    restart: unless-stopped
+    user: ${DOCKER_UGID}
+    working_dir: /home/node/web
+    command: npm run dev --debug
+    ports:
+      - ${HOST_PORT}:4000
+    volumes:
+      - type: bind
+        source: ${BUILDROOT}
+        target: /home/node
+volumes:
+  pixel-config: {}
