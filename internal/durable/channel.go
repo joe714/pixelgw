@@ -246,7 +246,7 @@ func (store *Store) ModifyChannelApplet(ctx context.Context, channelUUID uuid.UU
 		if cfg != nil {
 			app.Config = cfg
 			stmt = sqlair.MustPrepare(
-				`UPDATE channel_applet SET config = $ChannelApplet.config
+				`UPDATE channel_applets SET config = $ChannelApplet.config
 				    WHERE uuid = $ChannelApplet.uuid`,
 				ChannelApplet{})
 			err = tx.Query(stmt, app).Run()
