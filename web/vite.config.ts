@@ -44,7 +44,7 @@ export default defineConfig({
 	'/ws': {
 	    target: 'http://app:8080',
 	    ws: true,
-	    rewriteWsOrigin: true,
+	    rewriteWsOrigin: false,
 	},
       }
   }

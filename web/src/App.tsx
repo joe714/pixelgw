@@ -1,8 +1,8 @@
-import "@mantine/core/styles.css";
-
 import { AppShell, Burger, createTheme, Group, MantineProvider, NavLink, Text } from "@mantine/core";
 import { useDisclosure } from '@mantine/hooks';
+import { Link, Outlet } from "react-router-dom";
 
+import "@mantine/core/styles.css";
 import classNames from "./App.module.css";
 
 const theme = createTheme({});
@@ -27,20 +27,24 @@ function App() {
         </AppShell.Header>
         <AppShell.Navbar p="md">
 	  <NavLink
-	    href="#required-for-focus"
+	    component={Link}
+            to="/applets"
 	    label="Applets"
 	  />
 	  <NavLink
-	    href="#required-for-focus"
+	    component={Link}
+            to={'/channels'}
 	    label="Channels"
 	  />
 	  <NavLink
-	    href="#required-for-focus"
+	    component={Link}
+            to="/devices"
 	    label="Devices"
 	  />
       </AppShell.Navbar>
 
         <AppShell.Main className={classNames.main}>
+	  <Outlet />
         </AppShell.Main>
       </AppShell>
     </MantineProvider>
