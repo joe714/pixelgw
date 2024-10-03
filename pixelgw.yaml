@@ -4,7 +4,7 @@ info:
   title: Pixel Gateway
   description: API to manage PixelMatrix servier and displays
 servers:
-  - url: http://localhost:8080/api
+  - url: /api
 paths:
   /applets:
     get:

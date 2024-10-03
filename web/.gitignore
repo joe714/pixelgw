@@ -25,3 +25,5 @@ dist-ssr
 
 *.css.d.ts
 *.scss.d.ts
+
+openapi/

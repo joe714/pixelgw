@@ -1,8 +1,12 @@
-import { Text } from '@mantine/core';
+import { useDefaultServiceGetChannels } from "../openapi/queries";
 
 function ChannelViewPane() {
+    const { data } = useDefaultServiceGetChannels();
+
     return (
-	<Text>Channels Page</Text>
+	<ul>
+	  {data?.map((e) => <li key={e.uuid}>{e.name} - {e.comment}</li>)}
+        </ul>
     );
 }
 

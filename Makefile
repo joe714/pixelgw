@@ -29,7 +29,7 @@ stage1:
 
 web:
 	docker run --rm -it ${DOCKER_USERFLAG} -v .:/home/node -w /home/node/web ${DOCKER_NODE_IMAGE} \
-	       	sh -c 'npm install && npm run build'
+	       	sh -c 'npm install && npm run codegen && npm run build'
 
 generate: stage1
 	docker run --rm -it --user $$(id -u):$$(id -g) -v $$(pwd):/go/src ${_STAGE1_IMAGE} make -f build/Makefile generate
