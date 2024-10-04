@@ -1,54 +1,25 @@
-import { AppShell, Burger, createTheme, Group, MantineProvider, NavLink, Text } from "@mantine/core";
-import { useDisclosure } from '@mantine/hooks';
-import { Link, Outlet } from "react-router-dom";
-
-import "@mantine/core/styles.css";
-import classNames from "./App.module.css";
-
-const theme = createTheme({});
+import { Outlet } from 'react-router-dom'
 
 function App() {
-  const [opened, {toggle}] = useDisclosure();
-
   return (
-    <MantineProvider theme={theme} defaultColorScheme="dark">
-      <AppShell
-        header={{ height: 60 }}
-	navbar={{ width: 150, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-        padding="md"
-      >
-        <AppShell.Header className={classNames.header}>
-	  <Group h="100%" px="md">
-	    <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Text size="xl" fw="bold" pl="md">
-              PixelGW
-            </Text>
-	  </Group>
-        </AppShell.Header>
-        <AppShell.Navbar p="md">
-	  <NavLink
-	    component={Link}
-            to="/applets"
-	    label="Applets"
-	  />
-	  <NavLink
-	    component={Link}
-            to={'/channels'}
-	    label="Channels"
-	  />
-	  <NavLink
-	    component={Link}
-            to="/devices"
-	    label="Devices"
-	  />
-      </AppShell.Navbar>
-
-        <AppShell.Main className={classNames.main}>
-	  <Outlet />
-        </AppShell.Main>
-      </AppShell>
-    </MantineProvider>
-  );
+    <div className="flex flex-col w-screen h-svh max-h-svh">
+      <div className="flex w-full">
+        <div className="sticky top-0 w-full">
+          <div className="p-5">
+            <h1 className="text-left text-xl">Header</h1>
+          </div>
+       </div>
+      </div>
+      <div className="flex flex-row w-full h-full flex-1">
+        <div className="h-full w-1/5 p-4">
+          <h1 className="text-xl">Left</h1>
+        </div>
+        <div className="h-full flex-1 p-4">
+          <Outlet />
+        </div>
+      </div>
+    </div>
+  )
 }
 
-export default App;
+export default App

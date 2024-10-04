@@ -2,3 +2,4 @@
 .*.swp
 .cache
 .npm
+.*_history

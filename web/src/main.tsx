@@ -1,40 +1,28 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-//import { OpenAPI as OpenAPIConfig } from "../openapi/requests/core/OpenAPI";
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createBrowserRouter, RouterProvider } from "react-router-dom"
 
-import App from "./App.tsx";
-import AppletViewPane from "./AppletViewPane.tsx";
-import ChannelViewPane from "./ChannelViewPane.tsx";
-import ErrorPage from "./ErrorPage.tsx";
+import App from './App.tsx'
+import { ChannelList, channelListLoader } from "@/pages/channel-list"
 
-//OpenAPIConfig.BASE='/api/';
-
-const queryClient = new QueryClient();
+import './index.css'
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
-    errorElement: <ErrorPage />,
     children: [
       {
-        path: "/applets",
-	element: <AppletViewPane />
-      },
-      {
-        path: "/channels",
-	element: <ChannelViewPane />
+        index: true,
+	element: <ChannelList />,
+	loader: channelListLoader,
       },
     ],
   },
 ]);
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </React.StrictMode>,
-);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <RouterProvider router={router} />
+  </StrictMode>,
+)
