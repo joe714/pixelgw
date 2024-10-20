@@ -113,7 +113,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 			last_ip TEXT,
 			last_time TEXT
 			)`,
-		`CREATE INDEX idx_channel_devices ON devices (channel_uuid, id)`,
+		`CREATE INDEX idx_channel_devices ON devices (channel_uuid, uuid)`,
 		`INSERT INTO channels VALUES ('76ffcb18-d3c7-40d5-abea-3fe86d02a4ba', 'default', 'The default channel')`,
 		`INSERT INTO channel_applets VALUES ('efe35cfa-4076-4e84-9c9c-961e821769bd',
                                              '76ffcb18-d3c7-40d5-abea-3fe86d02a4ba',
