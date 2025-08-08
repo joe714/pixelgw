@@ -26,8 +26,8 @@ var upgrader = websocket.Upgrader{
 var lastSessionID atomic.Uint32
 
 type ClientImage struct {
-	ttl  time.Duration
-	data []byte
+	TTL  time.Duration
+	Data []byte
 }
 
 // TODO naming here is not quite right.
@@ -118,7 +118,7 @@ func (c *Client) writePump() {
 				// Closed channel means we're already deregistered
 				return
 			}
-			err := c.write(msg.data)
+			err := c.write(msg.Data)
 			if err != nil {
 				break
 			}

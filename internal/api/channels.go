@@ -3,6 +3,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -52,6 +53,22 @@ func (s *Server) CreateChannel(ctx context.Context, request CreateChannelRequest
 }
 
 func (s *Server) FindChannelByUUID(ctx context.Context, request FindChannelByUUIDRequestObject) (FindChannelByUUIDResponseObject, error) {
+	if WantWebp(ctx) {
+		img, err := s.hub.GetLastImage(request.UUID)
+		if err != nil {
+			return FindChannelByUUIDdefaultJSONResponse{
+					Body:       RenderError(err),
+					StatusCode: StatusCode(err),
+				},
+				nil
+		}
+		return FindChannelByUUID200ImagewebpResponse{
+				Body:          bytes.NewReader(img.Data),
+				ContentLength: int64(len(img.Data)),
+			},
+			nil
+	}
+
 	ch, err := s.store.GetChannelByUUID(ctx, request.UUID)
 	if err != nil {
 		return FindChannelByUUIDdefaultJSONResponse{

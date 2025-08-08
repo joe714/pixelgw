@@ -3,12 +3,23 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
+
+	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 
 	"github.com/joe714/pixelgw/internal/durable"
 	"github.com/joe714/pixelgw/internal/errors"
 	"github.com/joe714/pixelgw/internal/hub"
+)
+
+type contextKey string
+
+var (
+	contextKeyAccept = contextKey("Accept")
 )
 
 var statusCodes = map[error]int{
@@ -38,6 +49,29 @@ func StatusCode(err error) int {
 		return val
 	}
 	return http.StatusInternalServerError
+}
+
+func WantWebp(ctx context.Context) bool {
+	if v, ok := ctx.Value(contextKeyAccept).(string); ok {
+		r := strings.Contains(v, "image/webp") || strings.Contains(v, "image/*")
+		log.Printf("Webp %v (%v)", r, v)
+		return r
+	}
+	return false
+}
+
+func AcceptMiddleware(f strictnethttp.StrictHTTPHandlerFunc, operationID string) strictnethttp.StrictHTTPHandlerFunc {
+	return strictnethttp.StrictHTTPHandlerFunc(
+		func(ctx context.Context,
+			w http.ResponseWriter,
+			r *http.Request,
+			request interface{}) (response interface{}, err error) {
+			v := r.Header.Get("Accept")
+			if v != "" {
+				ctx = context.WithValue(ctx, contextKeyAccept, strings.ToLower(v))
+			}
+			return f(ctx, w, r, request)
+		})
 }
 
 func ServerOptions() StrictHTTPServerOptions {

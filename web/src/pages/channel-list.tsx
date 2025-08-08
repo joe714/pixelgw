@@ -15,17 +15,25 @@ export function ChannelList() {
   const { data } = useLoaderData<typeof channelListLoader>();
   console.log(data)
   const rows = data?.map((e) => {
+    const img = "/api/channels/" + e.uuid
+    console.log(img)
     return (
         <li>
-          <div className="flex flex-col w-full">
-            <Separator className="my-4" />
-            <div className="flex flex-row justify-start">
-              <div className="font-bold text-lg text-sky-500">{e.name}</div>
+          <Separator className="my-4" />
+          <div className="flex flex-row w-full justify-between">
+            <div className="flex flex-col grow-1 justify-between">
+              <div className="grow-0 font-bold text-lg text-sky-500">{e.name}</div>
+              <div className="grow-0 text-slate-300 my-1">{e.comment}</div>
+              <div className="grow-1"></div>
+              <div className="grow-0 flex flex-row text-sm text-slate-400 space-x-2">
+                <div>3 devices</div>
+                <div>2 apps</div>
+              </div>
             </div>
-            <div className="text-slate-300 my-1">{e.comment}</div>
-            <div className="flex flex-row text-sm text-slate-400 space-x-2">
-              <div>3 devices</div>
-              <div>2 apps</div>
+            <div className="justify-right content-center">
+              <div className="rounded border">
+                <img src={img} width="128" height="64" />
+              </div>
             </div>
           </div>
         </li>

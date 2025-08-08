@@ -109,6 +109,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChannelDetail'
+            image/webp:
+              schema:
+                type: string
+                format: binary
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
   /channels/{channelUUID}/applets:

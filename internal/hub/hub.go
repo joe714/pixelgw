@@ -258,3 +258,16 @@ func (h *Hub) GetSessions() []SessionInfo {
 	})
 	return resp
 }
+
+func (h *Hub) GetLastImage(channelUUID uuid.UUID) (*ClientImage, error) {
+	var resp *ClientImage
+	err := RunTask(h.tasks, func() error {
+		ch, err := h.getChannel(channelUUID)
+		if err != nil {
+			return err
+		}
+		resp = ch.last
+		return nil
+	})
+	return resp, err
+}

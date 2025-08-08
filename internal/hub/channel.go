@@ -66,7 +66,7 @@ func (c *Channel) run() {
 			buf, ttl := c.renderNext()
 			if buf != nil {
 				// TODO: redo the ttl / priority of channel images vs uploads
-				c.last = &ClientImage{ttl: ttl, data: buf}
+				c.last = &ClientImage{TTL: ttl, Data: buf}
 				for client, _ := range c.clients {
 					client.send <- c.last
 				}

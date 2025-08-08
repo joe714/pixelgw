@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 	"io/fs"
 	"log"
 	"net/http"
@@ -25,6 +26,7 @@ func (d fallbackFS) Open(path string) (http.File, error) {
 }
 
 func main() {
+	middlewares := []strictnethttp.StrictHTTPMiddlewareFunc{api.AcceptMiddleware}
 	runtime.InitCache(runtime.NewInMemoryCache())
 	fs := http.FileServer(fallbackFS{fs: http.Dir("./static")})
 
@@ -41,7 +43,7 @@ func main() {
 
 	root.Handle("/", fs)
 	root.HandleFunc("/ws", hub.GetWsHandler())
-	hdlr := api.NewStrictHandlerWithOptions(svr, nil, api.ServerOptions())
+	hdlr := api.NewStrictHandlerWithOptions(svr, middlewares, api.ServerOptions())
 	api.HandlerFromMuxWithBaseURL(hdlr, root, "/api")
 
 	s := &http.Server{
