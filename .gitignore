@@ -3,3 +3,4 @@
 .cache
 .npm
 .*_history
+/bin

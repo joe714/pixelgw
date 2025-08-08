@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom"
 
 import App from './App.tsx'
 import { ChannelList, channelListLoader } from "@/pages/channel-list"
+import { PixelDisplayDebug } from "@/pages/pixel-display-debug"
 
 import './index.css'
 
@@ -16,6 +17,10 @@ const router = createBrowserRouter([
         index: true,
 	element: <ChannelList />,
 	loader: channelListLoader,
+      },
+      {
+        path: "debug",
+        element: <PixelDisplayDebug />,
       },
     ],
   },

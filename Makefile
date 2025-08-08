@@ -6,7 +6,7 @@ DOCKER_NODE_IMAGE = node:22-alpine
 APP_NAME = pixelgw
 GIT_HASH ?= $(shell git log --format="%h" -n 1)
 
-DOCKER_RUN_NODE = run --rm -it ${DOCKER_USERFLAG} -v ${BUILDROOT}:/home/node -w /home/node/web ${DOCKER_NODE_IMAGE}
+DOCKER_RUN_NODE = run --rm ${DOCKER_USERFLAG} -v ${BUILDROOT}:/home/node -w /home/node/web ${DOCKER_NODE_IMAGE}
 
 _BUILD_ARGS_TAG ?= ${GIT_HASH}
 _BUILD_ARGS_RELEASE_TAG ?= latest
@@ -39,7 +39,7 @@ web: web_generate
 	docker ${DOCKER_RUN_NODE} npm run build
 
 generate: stage1
-	docker run --rm -it ${DOCKER_USERFLAG} -v ${BUILDROOT}:/go/src ${_STAGE1_IMAGE} \
+	docker run --rm ${DOCKER_USERFLAG} -v ${BUILDROOT}:/go/src ${_STAGE1_IMAGE} \
 	       	make -f build/Makefile generate
 
 tag: build
