@@ -4,6 +4,8 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom"
 
 import App from './App.tsx'
 import { ChannelList, channelListLoader } from "@/pages/channel-list"
+import { DevicesList, devicesLoader } from "@/pages/devices"
+import { AppletsList, appletsLoader } from "@/pages/applets"
 import { PixelDisplayDebug } from "@/pages/pixel-display-debug"
 
 import './index.css'
@@ -17,6 +19,16 @@ const router = createBrowserRouter([
         index: true,
 	element: <ChannelList />,
 	loader: channelListLoader,
+      },
+      {
+        path: "devices",
+        element: <DevicesList />,
+        loader: devicesLoader,
+      },
+      {
+        path: "applets",
+        element: <AppletsList />,
+        loader: appletsLoader,
       },
       {
         path: "debug",

@@ -1,6 +1,7 @@
 # Ignore vim recovery files
 .*.swp
+.*_history
+.agent-os
 .cache
 .npm
-.*_history
 /bin

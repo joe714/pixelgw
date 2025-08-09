@@ -1,22 +1,12 @@
 import { Outlet } from 'react-router-dom'
+import { Sidebar } from '@/components/Sidebar'
 
 function App() {
   return (
-    <div className="flex flex-col w-screen h-svh max-h-svh">
-      <div className="flex w-full">
-        <div className="sticky top-0 w-full">
-          <div className="p-5">
-            <h1 className="text-left text-xl">Header</h1>
-          </div>
-       </div>
-      </div>
-      <div className="flex flex-row w-full h-full flex-1">
-        <div className="h-full w-1/5 p-4">
-          <h1 className="text-xl">Left</h1>
-        </div>
-        <div className="h-full flex-1 p-4">
-          <Outlet />
-        </div>
+    <div className="flex w-screen h-screen overflow-hidden bg-gray-950">
+      <Sidebar />
+      <div className="flex-1 overflow-auto">
+        <Outlet />
       </div>
     </div>
   )

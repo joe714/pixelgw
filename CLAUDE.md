@@ -41,6 +41,12 @@ npm run build
 
 # Run linter
 npm run lint
+
+# **Note:** Typically the staging server with HMR is running on
+# http://localhost:8081/ at all times. Attempt to use it for testing
+# changes, and if not running or it needs to be rebuilt, rebuild and
+# deploy:
+make deploy_test
 ```
 
 ### Go Development
