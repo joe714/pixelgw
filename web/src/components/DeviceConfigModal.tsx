@@ -107,15 +107,17 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
                 className="pr-10"
                 disabled
               />
-              <Copy
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 cursor-pointer hover:text-gray-700"
+              <div
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
                 title="Copy"
                 onClick={() => {
                   if (device.uuid) {
                     navigator.clipboard.writeText(device.uuid)
                   }
                 }}
-              />
+              >
+                <Copy className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
