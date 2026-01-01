@@ -37,15 +37,17 @@ type ClientImage struct {
 type Client struct {
 	SessionID uint32
 	UUID      uuid.UUID
+	RealIP    string // The actual client IP (may differ from conn.RemoteAddr if proxied)
 	hub       atomic.Pointer[Hub]
 	conn      *websocket.Conn
 	send      chan *ClientImage
 }
 
-func NewClient(clientUUID uuid.UUID, conn *websocket.Conn) *Client {
+func NewClient(clientUUID uuid.UUID, conn *websocket.Conn, realIP string) *Client {
 	client := Client{
 		SessionID: lastSessionID.Add(1),
 		UUID:      clientUUID,
+		RealIP:    realIP,
 		conn:      conn,
 		send:      make(chan *ClientImage, 1),
 	}

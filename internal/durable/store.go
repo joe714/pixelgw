@@ -63,6 +63,15 @@ func NewStore() (*Store, error) {
 
 	log.Printf("Current database schema: %v\n", v.Version)
 
+	// Run migrations if needed
+	if v.Version < 2 {
+		v, err = store.migrateToV2()
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("Migrated to schema version: %v\n", v.Version)
+	}
+
 	return &store, nil
 }
 
@@ -111,7 +120,8 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 			name TEXT NOT NULL UNIQUE COLLATE NOCASE,
 			channel_uuid TEXT NOT NULL COLLATE NOCASE,
 			last_ip TEXT,
-			last_time TEXT
+			last_connect_time TEXT,
+			last_disconnect_time TEXT
 			)`,
 		`CREATE INDEX idx_channel_devices ON devices (channel_uuid, id)`,
 		`INSERT INTO channels VALUES ('76ffcb18-d3c7-40d5-abea-3fe86d02a4ba', 'default', 'The default channel')`,
@@ -125,7 +135,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
                                              1,
                                              'dvd-logo',
                                              NULL)`,
-		`INSERT INTO schema_version VALUES(1);`,
+		`INSERT INTO schema_version VALUES(2);`,
 	}
 	log.Println("Perform initial database setup")
 
@@ -143,5 +153,30 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 		return nil
 	})
 
-	return SchemaVersion{Version: 1}, err
+	return SchemaVersion{Version: 2}, err
+}
+
+func (store *Store) migrateToV2() (SchemaVersion, error) {
+	stmts := []string{
+		// Rename last_time to last_connect_time and add last_disconnect_time
+		`ALTER TABLE devices RENAME COLUMN last_time TO last_connect_time`,
+		`ALTER TABLE devices ADD COLUMN last_disconnect_time TEXT`,
+		`INSERT INTO schema_version VALUES(2);`,
+	}
+	log.Println("Migrating database to version 2")
+
+	err := store.Update(context.Background(), func(tx *TX) error {
+		for _, s := range stmts {
+			log.Println(s)
+			stmt := sqlair.MustPrepare(s)
+			err := tx.Query(stmt).Run()
+			if err != nil {
+				log.Printf("Migration error: %v", err)
+				return err
+			}
+		}
+		return nil
+	})
+
+	return SchemaVersion{Version: 2}, err
 }

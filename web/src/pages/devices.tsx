@@ -11,15 +11,32 @@ export const devicesLoader = makeLoader(
   async () => await restClient.GET("/devices")
 );
 
+function formatLastSeen(timestamp: string | undefined): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  return `${diffDays}d ago`
+}
+
 export function DevicesList() {
   const { data } = useLoaderData<typeof devicesLoader>();
   const [selectedDevice, setSelectedDevice] = useState<any>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  
+
   const devices = data?.map((device) => {
-    // Devices don't have a status field in the API, we'll assume online if they appear in the list
-    const isOnline = true
-    
+    const isOnline = device.connected ?? false
+    const currentIP = device["current-ip"]
+    const lastIP = device["last-ip"]
+    const lastDisconnect = device["last-disconnect-time"]
+
     return (
       <li key={device.uuid}>
         <Separator className="my-4" />
@@ -35,12 +52,17 @@ export function DevicesList() {
                 {isOnline ? (
                   <>
                     <Wifi className="h-4 w-4 text-green-500" />
-                    <span className="text-xs text-green-500">Connected</span>
+                    <span className="text-xs text-green-500">{currentIP}</span>
                   </>
                 ) : (
                   <>
-                    <WifiOff className="h-4 w-4 text-gray-500" />
-                    <span className="text-xs text-gray-500">Offline</span>
+                    <WifiOff className="h-4 w-4 text-red-500" />
+                    <span className="text-xs text-red-500">Not Connected</span>
+                    {lastDisconnect && lastIP && (
+                      <span className="text-xs text-slate-500">
+                        • Last seen {formatLastSeen(lastDisconnect)} at {lastIP}
+                      </span>
+                    )}
                   </>
                 )}
                 {device.channel && (
@@ -50,8 +72,8 @@ export function DevicesList() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => {
                 setSelectedDevice(device)

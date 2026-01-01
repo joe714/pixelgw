@@ -3,9 +3,21 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/joe714/pixelgw/internal/durable"
 )
+
+func parseTime(s *string) *time.Time {
+	if s == nil {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return nil
+	}
+	return &t
+}
 
 func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject) (GetDevicesResponseObject, error) {
 	devs, err := s.store.GetAllDevices(ctx)
@@ -16,16 +28,39 @@ func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject
 			},
 			nil
 	}
+
+	// Build a map of currently connected devices from live sessions
+	sessions := s.hub.GetSessions()
+	connectedDevices := make(map[string]string) // device UUID -> current IP
+	for _, sess := range sessions {
+		connectedDevices[sess.DeviceUUID.String()] = sess.RemoteAddr
+	}
+
 	resp := make([]DeviceSummary, 0, len(devs))
 	for _, d := range devs {
-		resp = append(resp, DeviceSummary{
+		ds := DeviceSummary{
 			UUID: &d.UUID,
 			Name: &d.Name,
 			Channel: &ChannelRef{
 				UUID: &d.ChannelUUID,
 				Name: d.ChannelName,
 			},
-		})
+			LastIP:             d.LastIP,
+			LastConnectTime:    parseTime(d.LastConnectTime),
+			LastDisconnectTime: parseTime(d.LastDisconnectTime),
+		}
+
+		// Check if device is currently connected
+		if currentIP, ok := connectedDevices[d.UUID.String()]; ok {
+			connected := true
+			ds.Connected = &connected
+			ds.CurrentIP = &currentIP
+		} else {
+			connected := false
+			ds.Connected = &connected
+		}
+
+		resp = append(resp, ds)
 	}
 	return GetDevices200JSONResponse(resp), nil
 }
@@ -39,6 +74,19 @@ func (s *Server) GetDeviceByUUID(ctx context.Context, request GetDeviceByUUIDReq
 			},
 			nil
 	}
+
+	// Check if device is currently connected
+	sessions := s.hub.GetSessions()
+	var currentIP *string
+	connected := false
+	for _, sess := range sessions {
+		if sess.DeviceUUID == request.UUID {
+			connected = true
+			currentIP = &sess.RemoteAddr
+			break
+		}
+	}
+
 	resp := DeviceSummary{
 		UUID: &d.UUID,
 		Name: &d.Name,
@@ -46,6 +94,11 @@ func (s *Server) GetDeviceByUUID(ctx context.Context, request GetDeviceByUUIDReq
 			UUID: &d.ChannelUUID,
 			Name: d.ChannelName,
 		},
+		Connected:          &connected,
+		CurrentIP:          currentIP,
+		LastIP:             d.LastIP,
+		LastConnectTime:    parseTime(d.LastConnectTime),
+		LastDisconnectTime: parseTime(d.LastDisconnectTime),
 	}
 	return GetDeviceByUUID200JSONResponse(resp), nil
 }

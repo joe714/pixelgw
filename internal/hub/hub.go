@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -131,6 +132,10 @@ func (h *Hub) unregister(client *Client) {
 			log.Printf("%v deregister %v\n", client, ch.Name)
 			ch.unsubscribe(client)
 			delete(h.clients, client)
+			// Record disconnect time in database
+			if err := h.store.LogoutDevice(context.Background(), client.UUID); err != nil {
+				log.Printf("%v failed to record logout: %v\n", client, err)
+			}
 		}
 		return nil
 	})
@@ -206,6 +211,17 @@ func (h *Hub) SubscribeDevice(deviceUUID uuid.UUID, channelUUID uuid.UUID) error
 
 func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	// Check for X-Forwarded-For header (set by reverse proxies)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first (original client)
+		if idx := strings.Index(xff, ","); idx != -1 {
+			host = strings.TrimSpace(xff[:idx])
+		} else {
+			host = strings.TrimSpace(xff)
+		}
+		// Strip IPv6 prefix if present (e.g., "::ffff:192.168.1.1" -> "192.168.1.1")
+		host = strings.TrimPrefix(host, "::ffff:")
+	}
 	q := r.URL.Query()
 	id := q.Get("device")
 
@@ -222,7 +238,7 @@ func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := h.store.LoginDevice(r.Context(), deviceUUID)
+	device, err := h.store.LoginDevice(r.Context(), deviceUUID, host)
 	if err != nil {
 		log.Println("%v %v: failed to get device configuration: %v", deviceUUID, host, err)
 		return
@@ -232,7 +248,7 @@ func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("%v %v: failed to establish websocket: %v", deviceUUID, host, err)
 		return
 	}
-	client := NewClient(deviceUUID, conn)
+	client := NewClient(deviceUUID, conn, host)
 	log.Printf("%v established from %v", client, host)
 	_ = h.register(client, device.ChannelUUID)
 }
@@ -245,11 +261,10 @@ func (h *Hub) GetSessions() []SessionInfo {
 	resp := []SessionInfo{}
 	_ = RunTask(h.tasks, func() error {
 		for k, v := range h.clients {
-			addr, _, _ := net.SplitHostPort(k.RemoteAddr().String())
 			resp = append(resp, SessionInfo{
 				SessionID:   k.SessionID,
 				DeviceUUID:  k.UUID,
-				RemoteAddr:  addr,
+				RemoteAddr:  k.RealIP,
 				ChannelUUID: v.UUID,
 				ChannelName: v.Name,
 			})

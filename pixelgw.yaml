@@ -412,6 +412,27 @@ components:
         - properties:
             channel:
               $ref: '#/components/schemas/ChannelRef'
+            connected:
+              type: boolean
+              description: Whether the device is currently connected
+            current-ip:
+              type: string
+              description: Current IP address if connected
+              x-go-name: CurrentIP
+            last-ip:
+              type: string
+              description: Last known IP address
+              x-go-name: LastIP
+            last-connect-time:
+              type: string
+              format: date-time
+              description: Last connection timestamp
+              x-go-name: LastConnectTime
+            last-disconnect-time:
+              type: string
+              format: date-time
+              description: Last disconnection timestamp
+              x-go-name: LastDisconnectTime
     SessionSummary:
       type: object
       properties:

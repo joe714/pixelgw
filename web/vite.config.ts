@@ -23,6 +23,14 @@ export default defineConfig({
 	    target: 'http://app:8080',
 	    ws: true,
 	    rewriteWsOrigin: false,
+	    configure: (proxy) => {
+	      proxy.on('proxyReqWs', (proxyReq, req) => {
+	        const clientIp = req.socket.remoteAddress;
+	        if (clientIp) {
+	          proxyReq.setHeader('X-Forwarded-For', clientIp);
+	        }
+	      });
+	    },
 	},
       }
   }
