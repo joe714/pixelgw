@@ -233,19 +233,19 @@ func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	deviceUUID, err := uuid.Parse(id)
 	if err != nil {
-		log.Println("%v %v: Device UUID is not valid: %v", id, host, err)
+		log.Printf("%v %v: Device UUID is not valid: %v\n", id, host, err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	device, err := h.store.LoginDevice(r.Context(), deviceUUID, host)
 	if err != nil {
-		log.Println("%v %v: failed to get device configuration: %v", deviceUUID, host, err)
+		log.Printf("%v %v: failed to get device configuration: %v\n", deviceUUID, host, err)
 		return
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("%v %v: failed to establish websocket: %v", deviceUUID, host, err)
+		log.Printf("%v %v: failed to establish websocket: %v\n", deviceUUID, host, err)
 		return
 	}
 	client := NewClient(deviceUUID, conn, host)

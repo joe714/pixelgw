@@ -108,7 +108,7 @@ func (c *Channel) renderNext() ([]byte, time.Duration) {
 		screens := encode.ScreensFromRoots(roots)
 		img, err := screens.EncodeWebP(15000)
 		if err != nil {
-			log.Printf("%v %v encoding failed %v: %v\n", c.Name, app.Manifest.Name, err)
+			log.Printf("%v %v encoding failed: %v\n", c.Name, app.Manifest.Name, err)
 			continue
 		}
 		log.Printf("%v %v success (%v %x)\n", c.Name, app.Manifest.Name, len(img), md5.Sum(img))
