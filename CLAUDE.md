@@ -95,6 +95,11 @@ Devices connect via: `ws://server:8080/ws?device=<deviceUUID>`
 3. Run `npm run codegen` in web/ to update TypeScript client
 4. Changes automatically integrated into build process
 
+## Git Workflow
+
+- **Push to `origin` only**: Always push to `origin` remote, not `github`, unless specifically instructed otherwise
+- This applies to both PixelGW and PixelFirmware repositories
+
 ## Important Development Notes
 
 - **Single-tenant design**: No authentication by design (trusted network assumption)
