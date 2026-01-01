@@ -32,6 +32,12 @@ func (tx *TX) Query(s *sqlair.Statement, inputArgs ...any) *sqlair.Query {
 	return tx.tx.Query(tx.Context, s, inputArgs...)
 }
 
+// NewStoreWithDB creates a Store with a pre-initialized sqlair.DB.
+// This is primarily used for testing with in-memory databases.
+func NewStoreWithDB(db *sqlair.DB) *Store {
+	return &Store{DB: db}
+}
+
 func NewStore() (*Store, error) {
 	sqldb, err := sql.Open("sqlite3", "./etc/cfg.db")
 	if err != nil {
