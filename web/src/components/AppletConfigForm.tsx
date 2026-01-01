@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DateTimePicker } from '@/components/DateTimePicker'
 import type { components } from '@/openapi'
 
 type SchemaField = components['schemas']['SchemaField']
@@ -115,6 +116,22 @@ export function AppletConfigForm({ schema, config, onChange }: AppletConfigFormP
                 onChange={(e) => handleFieldChange(field.id!, e.target.value)}
                 className="flex-1"
                 placeholder="#ffffff"
+              />
+            </div>
+          </div>
+        )
+
+      case 'datetime':
+        return (
+          <div key={field.id} className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor={field.id} className="text-right text-sm pt-2">
+              {field.name || field.id}
+            </Label>
+            <div className="col-span-3">
+              <DateTimePicker
+                id={field.id}
+                value={fieldValue}
+                onChange={(value) => handleFieldChange(field.id!, value)}
               />
             </div>
           </div>
