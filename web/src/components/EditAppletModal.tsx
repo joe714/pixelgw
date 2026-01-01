@@ -32,8 +32,29 @@ export function EditAppletModal({ open, onOpenChange, channelUuid, applet }: Edi
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const revalidator = useRevalidator()
 
-  // Fetch applet schema when modal opens
+  // Reset state when applet changes
   useEffect(() => {
+    if (!open) {
+      setAppletDetails(null)
+      setConfig({})
+      setPreviewUrl(null)
+    }
+  }, [open])
+
+  // Fetch applet schema and parse config when modal opens
+  useEffect(() => {
+    if (!open || !applet) return
+
+    // Parse existing config immediately
+    let existingConfig: Record<string, string> = {}
+    try {
+      existingConfig = applet.config ? JSON.parse(applet.config) : {}
+    } catch {
+      existingConfig = {}
+    }
+    setConfig(existingConfig)
+
+    // Fetch schema
     async function fetchAppletDetails() {
       if (!applet?.['app-id']) return
       setLoading(true)
@@ -51,16 +72,7 @@ export function EditAppletModal({ open, onOpenChange, channelUuid, applet }: Edi
       }
     }
 
-    if (open && applet) {
-      fetchAppletDetails()
-      // Parse existing config
-      try {
-        const existingConfig = applet.config ? JSON.parse(applet.config) : {}
-        setConfig(existingConfig)
-      } catch {
-        setConfig({})
-      }
-    }
+    fetchAppletDetails()
   }, [open, applet])
 
   // Debounced preview rendering
@@ -136,6 +148,7 @@ export function EditAppletModal({ open, onOpenChange, channelUuid, applet }: Edi
               <div className="text-center py-4 text-slate-500">Loading schema...</div>
             ) : (
               <AppletConfigForm
+                key={applet?.uuid}
                 schema={appletDetails?.schema}
                 config={config}
                 onChange={setConfig}

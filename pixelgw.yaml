@@ -495,7 +495,7 @@ components:
         version:
           type: string
           description: Version
-        fields:
+        schema:
           type: array
           items:
             $ref: '#/components/schemas/SchemaField'

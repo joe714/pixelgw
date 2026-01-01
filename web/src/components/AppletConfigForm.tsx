@@ -19,7 +19,7 @@ interface AppletConfigFormProps {
 }
 
 export function AppletConfigForm({ schema, config, onChange }: AppletConfigFormProps) {
-  if (!schema?.fields || schema.fields.length === 0) {
+  if (!schema?.schema || schema.schema.length === 0) {
     return (
       <div className="text-slate-500 text-sm py-4">
         This applet has no configurable options.
@@ -141,7 +141,7 @@ export function AppletConfigForm({ schema, config, onChange }: AppletConfigFormP
 
   return (
     <div className="space-y-4">
-      {schema.fields.map((field) => renderField(field))}
+      {schema.schema.map((field) => renderField(field))}
     </div>
   )
 }
