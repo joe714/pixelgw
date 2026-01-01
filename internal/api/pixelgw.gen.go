@@ -150,6 +150,27 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Location defines model for Location.
+type Location struct {
+	// Description Full location description (e.g. "Brooklyn, NY, USA")
+	Description string `json:"description"`
+
+	// Lat Latitude
+	Lat string `json:"lat"`
+
+	// Lng Longitude
+	Lng string `json:"lng"`
+
+	// Locality City/locality name
+	Locality string `json:"locality"`
+
+	// PlaceID Unique place identifier
+	PlaceID string `json:"place_id"`
+
+	// Timezone IANA timezone identifier (e.g. "America/New_York")
+	Timezone string `json:"timezone"`
+}
+
 // Notification defines model for Notification.
 type Notification = SchemaField
 
@@ -209,6 +230,15 @@ type PatchDeviceJSONBody struct {
 	Name *string `json:"name,omitempty"`
 }
 
+// SearchLocationsParams defines parameters for SearchLocations.
+type SearchLocationsParams struct {
+	// Q Search query
+	Q string `form:"q" json:"q"`
+
+	// Limit Maximum number of results
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CreateChannelJSONRequestBody defines body for CreateChannel for application/json ContentType.
 type CreateChannelJSONRequestBody = ChannelSummary
 
@@ -259,6 +289,12 @@ type ServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Search locations
+	// (GET /locations)
+	SearchLocations(w http.ResponseWriter, r *http.Request, params SearchLocationsParams)
+	// Get location by place ID
+	// (GET /locations/{placeId})
+	GetLocationByPlaceID(w http.ResponseWriter, r *http.Request, placeId string)
 	// Get connected sessions
 	// (GET /sessions)
 	GetSessions(w http.ResponseWriter, r *http.Request)
@@ -583,6 +619,75 @@ func (siw *ServerInterfaceWrapper) PatchDevice(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// SearchLocations operation middleware
+func (siw *ServerInterfaceWrapper) SearchLocations(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchLocationsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	if paramValue := r.URL.Query().Get("q"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchLocations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetLocationByPlaceID operation middleware
+func (siw *ServerInterfaceWrapper) GetLocationByPlaceID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "placeId" -------------
+	var placeId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "placeId", r.PathValue("placeId"), &placeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "placeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLocationByPlaceID(w, r, placeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // GetSessions operation middleware
 func (siw *ServerInterfaceWrapper) GetSessions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -724,6 +829,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/devices", wrapper.GetDevices)
 	m.HandleFunc("GET "+options.BaseURL+"/devices/{uuid}", wrapper.GetDeviceByUUID)
 	m.HandleFunc("PATCH "+options.BaseURL+"/devices/{uuid}", wrapper.PatchDevice)
+	m.HandleFunc("GET "+options.BaseURL+"/locations", wrapper.SearchLocations)
+	m.HandleFunc("GET "+options.BaseURL+"/locations/{placeId}", wrapper.GetLocationByPlaceID)
 	m.HandleFunc("GET "+options.BaseURL+"/sessions", wrapper.GetSessions)
 
 	return m
@@ -1145,6 +1252,73 @@ func (response PatchDevicedefaultJSONResponse) VisitPatchDeviceResponse(w http.R
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type SearchLocationsRequestObject struct {
+	Params SearchLocationsParams
+}
+
+type SearchLocationsResponseObject interface {
+	VisitSearchLocationsResponse(w http.ResponseWriter) error
+}
+
+type SearchLocations200JSONResponse []Location
+
+func (response SearchLocations200JSONResponse) VisitSearchLocationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SearchLocationsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SearchLocationsdefaultJSONResponse) VisitSearchLocationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetLocationByPlaceIDRequestObject struct {
+	PlaceId string `json:"placeId"`
+}
+
+type GetLocationByPlaceIDResponseObject interface {
+	VisitGetLocationByPlaceIDResponse(w http.ResponseWriter) error
+}
+
+type GetLocationByPlaceID200JSONResponse Location
+
+func (response GetLocationByPlaceID200JSONResponse) VisitGetLocationByPlaceIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetLocationByPlaceID404JSONResponse Error
+
+func (response GetLocationByPlaceID404JSONResponse) VisitGetLocationByPlaceIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetLocationByPlaceIDdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetLocationByPlaceIDdefaultJSONResponse) VisitGetLocationByPlaceIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type GetSessionsRequestObject struct {
 }
 
@@ -1211,6 +1385,12 @@ type StrictServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(ctx context.Context, request PatchDeviceRequestObject) (PatchDeviceResponseObject, error)
+	// Search locations
+	// (GET /locations)
+	SearchLocations(ctx context.Context, request SearchLocationsRequestObject) (SearchLocationsResponseObject, error)
+	// Get location by place ID
+	// (GET /locations/{placeId})
+	GetLocationByPlaceID(ctx context.Context, request GetLocationByPlaceIDRequestObject) (GetLocationByPlaceIDResponseObject, error)
 	// Get connected sessions
 	// (GET /sessions)
 	GetSessions(ctx context.Context, request GetSessionsRequestObject) (GetSessionsResponseObject, error)
@@ -1582,6 +1762,58 @@ func (sh *strictHandler) PatchDevice(w http.ResponseWriter, r *http.Request, uui
 	}
 }
 
+// SearchLocations operation middleware
+func (sh *strictHandler) SearchLocations(w http.ResponseWriter, r *http.Request, params SearchLocationsParams) {
+	var request SearchLocationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchLocations(ctx, request.(SearchLocationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchLocations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchLocationsResponseObject); ok {
+		if err := validResponse.VisitSearchLocationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetLocationByPlaceID operation middleware
+func (sh *strictHandler) GetLocationByPlaceID(w http.ResponseWriter, r *http.Request, placeId string) {
+	var request GetLocationByPlaceIDRequestObject
+
+	request.PlaceId = placeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLocationByPlaceID(ctx, request.(GetLocationByPlaceIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLocationByPlaceID")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLocationByPlaceIDResponseObject); ok {
+		if err := validResponse.VisitGetLocationByPlaceIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetSessions operation middleware
 func (sh *strictHandler) GetSessions(w http.ResponseWriter, r *http.Request) {
 	var request GetSessionsRequestObject
@@ -1609,39 +1841,45 @@ func (sh *strictHandler) GetSessions(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"/1YgjK/UNgAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

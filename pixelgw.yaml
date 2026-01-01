@@ -89,6 +89,62 @@ paths:
                 $ref: '#/components/schemas/Error'
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+  /locations:
+    get:
+      summary: Search locations
+      description: Search for locations by name for location picker fields
+      operationId: searchLocations
+      parameters:
+        - name: q
+          in: query
+          description: Search query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Location search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /locations/{placeId}:
+    get:
+      summary: Get location by place ID
+      description: Get full location details by place ID
+      operationId: getLocationByPlaceID
+      parameters:
+        - name: placeId
+          in: path
+          description: Place ID of the location
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Location details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /channels:
     get:
       description: Returns the list of channels.
@@ -361,6 +417,35 @@ components:
           description: Author of the app
         schema:
            $ref: '#/components/schemas/Schema'
+    Location:
+      type: object
+      required:
+        - place_id
+        - description
+        - locality
+        - lat
+        - lng
+        - timezone
+      properties:
+        place_id:
+          type: string
+          description: Unique place identifier
+          x-go-name: PlaceID
+        description:
+          type: string
+          description: Full location description (e.g. "Brooklyn, NY, USA")
+        locality:
+          type: string
+          description: City/locality name
+        lat:
+          type: string
+          description: Latitude
+        lng:
+          type: string
+          description: Longitude
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g. "America/New_York")
     AppInstanceSummary:
       type: object
       properties:

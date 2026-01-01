@@ -3,13 +3,16 @@ package hub
 import (
 	"context"
 	"crypto/md5"
+	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/joe714/pixelgw/internal/catalog"
+	"github.com/joe714/pixelgw/internal/locations"
 	"tidbyt.dev/pixlet/encode"
 	"tidbyt.dev/pixlet/runtime"
+	"tidbyt.dev/pixlet/schema"
 )
 
 const (
@@ -89,7 +92,11 @@ func (c *Channel) renderNext() ([]byte, time.Duration) {
 			log.Printf("%v %v applet faild to load: %v\n", c.Name, app.Manifest.Name, err)
 			continue
 		}
-		roots, err := applet.RunWithConfig(context.Background(), app.Config)
+
+		// Expand location configs to full location JSON
+		config := expandLocationConfigs(applet.Schema, app.Config)
+
+		roots, err := applet.RunWithConfig(context.Background(), config)
 		if err != nil {
 			log.Printf("%v %v applet failed: %v\n", c.Name, app.Manifest.Name, err)
 			continue
@@ -110,6 +117,49 @@ func (c *Channel) renderNext() ([]byte, time.Duration) {
 	}
 	log.Printf("%v ran out of render attempts\n", c.Name)
 	return nil, renderPeriod
+}
+
+// expandLocationConfigs replaces location place_ids with full location JSON
+// The schema tells us which fields are location type, and we expand those
+// from place_id to the full JSON object that Pixlet expects
+func expandLocationConfigs(sch *schema.Schema, config map[string]string) map[string]string {
+	if sch == nil || len(config) == 0 {
+		return config
+	}
+
+	// Create a copy so we don't modify the original
+	result := make(map[string]string, len(config))
+	for k, v := range config {
+		result[k] = v
+	}
+
+	// Find location fields in the schema and expand them
+	for _, field := range sch.Fields {
+		if field.Type != "location" {
+			continue
+		}
+		placeID, ok := result[field.ID]
+		if !ok || placeID == "" {
+			continue
+		}
+
+		// Look up the full location data
+		loc := locations.FindByPlaceID(placeID)
+		if loc == nil {
+			log.Printf("Location not found for place_id: %s", placeID)
+			continue
+		}
+
+		// Convert to JSON as expected by Pixlet
+		locJSON, err := json.Marshal(loc)
+		if err != nil {
+			log.Printf("Failed to marshal location: %v", err)
+			continue
+		}
+		result[field.ID] = string(locJSON)
+	}
+
+	return result
 }
 
 func (c *Channel) subscribe(client *Client) error {
