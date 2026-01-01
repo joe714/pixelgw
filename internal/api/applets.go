@@ -10,6 +10,7 @@ import (
 	"log"
 	"slices"
 
+	"github.com/joe714/pixelgw/internal/locations"
 	"tidbyt.dev/pixlet/encode"
 	"tidbyt.dev/pixlet/runtime"
 )
@@ -65,6 +66,18 @@ func (s *Server) RenderApplet(ctx context.Context, request RenderAppletRequestOb
 		if err := json.Unmarshal([]byte(*request.Params.Config), &config); err != nil {
 			return nil, fmt.Errorf("invalid config JSON: %w", err)
 		}
+	}
+
+	// Expand location configs from place_id to full location JSON
+	if applet.Schema != nil {
+		fields := make([]locations.SchemaField, 0, len(applet.Schema.Fields))
+		for _, f := range applet.Schema.Fields {
+			fields = append(fields, locations.SchemaField{
+				ID:   f.ID,
+				Type: f.Type,
+			})
+		}
+		config = locations.ExpandLocationConfigs(fields, config)
 	}
 
 	// Run the applet with config

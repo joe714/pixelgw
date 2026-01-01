@@ -1,6 +1,9 @@
 package locations
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Location represents a geographic location with timezone info
 type Location struct {
@@ -189,4 +192,69 @@ func FindByPlaceID(placeID string) *Location {
 		}
 	}
 	return nil
+}
+
+// ExpandLocationConfigs replaces location place_ids with full location JSON
+// The schema tells us which fields are location type, and we expand those
+// from place_id to the full JSON object that Pixlet expects
+func ExpandLocationConfigs(schemaFields []SchemaField, config map[string]string) map[string]string {
+	if len(schemaFields) == 0 || len(config) == 0 {
+		return config
+	}
+
+	// Create a copy so we don't modify the original
+	result := make(map[string]string, len(config))
+	for k, v := range config {
+		result[k] = v
+	}
+
+	// Find location fields in the schema and expand them
+	for _, field := range schemaFields {
+		if field.Type != "location" {
+			continue
+		}
+		placeID, ok := result[field.ID]
+		if !ok || placeID == "" {
+			continue
+		}
+
+		// Look up the full location data
+		loc := FindByPlaceID(placeID)
+		if loc == nil {
+			continue
+		}
+
+		// Convert to JSON as expected by Pixlet
+		locJSON, err := loc.ToJSON()
+		if err != nil {
+			continue
+		}
+		result[field.ID] = locJSON
+	}
+
+	return result
+}
+
+// SchemaField represents a field from the applet schema
+type SchemaField struct {
+	ID   string
+	Type string
+}
+
+// ToJSON converts a Location to the JSON format expected by Pixlet
+func (l *Location) ToJSON() (string, error) {
+	// Pixlet expects this specific format
+	data := map[string]string{
+		"place_id":    l.PlaceID,
+		"description": l.Description,
+		"locality":    l.Locality,
+		"lat":         l.Lat,
+		"lng":         l.Lng,
+		"timezone":    l.Timezone,
+	}
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }

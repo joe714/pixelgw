@@ -3,7 +3,6 @@ package hub
 import (
 	"context"
 	"crypto/md5"
-	"encoding/json"
 	"log"
 	"time"
 
@@ -119,47 +118,23 @@ func (c *Channel) renderNext() ([]byte, time.Duration) {
 	return nil, renderPeriod
 }
 
-// expandLocationConfigs replaces location place_ids with full location JSON
-// The schema tells us which fields are location type, and we expand those
-// from place_id to the full JSON object that Pixlet expects
+// expandLocationConfigs converts pixlet schema fields to location schema fields
+// and delegates to the locations package for expansion
 func expandLocationConfigs(sch *schema.Schema, config map[string]string) map[string]string {
 	if sch == nil || len(config) == 0 {
 		return config
 	}
 
-	// Create a copy so we don't modify the original
-	result := make(map[string]string, len(config))
-	for k, v := range config {
-		result[k] = v
+	// Convert pixlet schema fields to locations schema fields
+	fields := make([]locations.SchemaField, 0, len(sch.Fields))
+	for _, f := range sch.Fields {
+		fields = append(fields, locations.SchemaField{
+			ID:   f.ID,
+			Type: f.Type,
+		})
 	}
 
-	// Find location fields in the schema and expand them
-	for _, field := range sch.Fields {
-		if field.Type != "location" {
-			continue
-		}
-		placeID, ok := result[field.ID]
-		if !ok || placeID == "" {
-			continue
-		}
-
-		// Look up the full location data
-		loc := locations.FindByPlaceID(placeID)
-		if loc == nil {
-			log.Printf("Location not found for place_id: %s", placeID)
-			continue
-		}
-
-		// Convert to JSON as expected by Pixlet
-		locJSON, err := json.Marshal(loc)
-		if err != nil {
-			log.Printf("Failed to marshal location: %v", err)
-			continue
-		}
-		result[field.ID] = string(locJSON)
-	}
-
-	return result
+	return locations.ExpandLocationConfigs(fields, config)
 }
 
 func (c *Channel) subscribe(client *Client) error {
