@@ -20,8 +20,10 @@ _COMPOSE_FILE ?= ${_COMPOSE_DIR}/compose.yaml
 _COMPOSE_ENV_FILE ?= ${_COMPOSE_DIR}/env
 _COMPOSE_TAG ?= ${GIT_HASH}
 
-.PHONY: build generate deploy web_install web_generate web
+.PHONY: build generate deploy web_install web_generate web pixelclient
 
+pixelclient:
+	go build -o bin/pixelclient ./cmd/pixelclient
 
 build: web
 	docker build -f build/package/Dockerfile --tag ${DOCKER_USERNAME}/${APP_NAME}:${_BUILD_ARGS_TAG} .
