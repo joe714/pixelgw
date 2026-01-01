@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	ne "errors"
 	"log"
 	"net/http"
 	"strings"
@@ -45,8 +46,10 @@ func RenderError(err error) Error {
 }
 
 func StatusCode(err error) int {
-	if val, ok := statusCodes[err]; ok {
-		return val
+	for key, val := range statusCodes {
+		if ne.Is(err, key) {
+			return val
+		}
 	}
 	return http.StatusInternalServerError
 }

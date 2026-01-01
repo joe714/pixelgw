@@ -30,10 +30,11 @@ func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject
 	}
 
 	// Build a map of currently connected devices from live sessions
-	sessions := s.hub.GetSessions()
 	connectedDevices := make(map[string]string) // device UUID -> current IP
-	for _, sess := range sessions {
-		connectedDevices[sess.DeviceUUID.String()] = sess.RemoteAddr
+	if s.hub != nil {
+		for _, sess := range s.hub.GetSessions() {
+			connectedDevices[sess.DeviceUUID.String()] = sess.RemoteAddr
+		}
 	}
 
 	resp := make([]DeviceSummary, 0, len(devs))
@@ -76,14 +77,15 @@ func (s *Server) GetDeviceByUUID(ctx context.Context, request GetDeviceByUUIDReq
 	}
 
 	// Check if device is currently connected
-	sessions := s.hub.GetSessions()
 	var currentIP *string
 	connected := false
-	for _, sess := range sessions {
-		if sess.DeviceUUID == request.UUID {
-			connected = true
-			currentIP = &sess.RemoteAddr
-			break
+	if s.hub != nil {
+		for _, sess := range s.hub.GetSessions() {
+			if sess.DeviceUUID == request.UUID {
+				connected = true
+				currentIP = &sess.RemoteAddr
+				break
+			}
 		}
 	}
 
@@ -175,7 +177,7 @@ func (s *Server) PatchDevice(ctx context.Context, request PatchDeviceRequestObje
 			},
 			nil
 	}
-	if subscribe {
+	if subscribe && s.hub != nil {
 		s.hub.SubscribeDevice(d.UUID, d.ChannelUUID)
 	}
 	return PatchDevice200Response{}, nil

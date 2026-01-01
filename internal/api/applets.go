@@ -16,10 +16,14 @@ import (
 )
 
 func (s *Server) GetApplets(ctx context.Context, request GetAppletsRequestObject) (GetAppletsResponseObject, error) {
+	if s.hub == nil || s.hub.Catalog == nil {
+		return GetApplets200JSONResponse([]App{}), nil
+	}
+
 	var resp []App
 
 	keys := make([]string, 0)
-	for k, _ := range s.hub.Catalog.Manifests {
+	for k := range s.hub.Catalog.Manifests {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
@@ -32,6 +36,9 @@ func (s *Server) GetApplets(ctx context.Context, request GetAppletsRequestObject
 }
 
 func (s *Server) GetAppletByID(ctx context.Context, request GetAppletByIDRequestObject) (GetAppletByIDResponseObject, error) {
+	if s.hub == nil || s.hub.Catalog == nil {
+		return nil, fmt.Errorf("applet catalog not available")
+	}
 	m := s.hub.Catalog.FindManifest(request.Id)
 	if m == nil {
 		return nil, fmt.Errorf("applet \"%v\" not registered", request.Id)
@@ -49,6 +56,9 @@ func (s *Server) GetAppletByID(ctx context.Context, request GetAppletByIDRequest
 }
 
 func (s *Server) RenderApplet(ctx context.Context, request RenderAppletRequestObject) (RenderAppletResponseObject, error) {
+	if s.hub == nil || s.hub.Catalog == nil {
+		return RenderApplet404JSONResponse{Code: 404, Message: "applet catalog not available"}, nil
+	}
 	m := s.hub.Catalog.FindManifest(request.Id)
 	if m == nil {
 		return RenderApplet404JSONResponse{Code: 404, Message: fmt.Sprintf("applet \"%v\" not found", request.Id)}, nil
