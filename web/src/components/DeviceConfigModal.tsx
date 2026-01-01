@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRevalidator } from 'react-router-dom'
-import { Copy } from 'lucide-react'
+import { Copy, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +49,8 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
   const [selectedChannelUuid, setSelectedChannelUuid] = useState(device.channel?.uuid || '')
   const [channels, setChannels] = useState<Array<{ uuid?: string; name?: string }>>([])
   const [loading, setLoading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const revalidator = useRevalidator()
 
   useEffect(() => {
@@ -83,6 +95,24 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
       console.error('Failed to update device:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!device.uuid) return
+
+    setDeleting(true)
+    try {
+      await restClient.DELETE('/devices/{uuid}', {
+        params: { path: { uuid: device.uuid } },
+      })
+      revalidator.revalidate()
+      setShowDeleteConfirm(false)
+      onOpenChange(false)
+    } catch (error) {
+      console.error('Failed to delete device:', error)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -150,15 +180,46 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
             </Select>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+        <DialogFooter className="sm:justify-between">
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="mr-auto"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Device
           </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            {loading ? 'Saving...' : 'Save changes'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? 'Saving...' : 'Save changes'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Device</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{device.name || device.uuid}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

@@ -128,3 +128,12 @@ func (store *Store) LogoutDevice(ctx context.Context, uuid uuid.UUID) error {
 		return tx.Query(stmt, sqlair.M{"uuid": uuid, "time": now}).Run()
 	})
 }
+
+func (store *Store) DeleteDevice(ctx context.Context, uuid uuid.UUID) error {
+	return store.Update(ctx, func(tx *TX) error {
+		stmt := sqlair.MustPrepare(
+			`DELETE FROM devices WHERE uuid = $M.uuid`,
+			sqlair.M{})
+		return tx.Query(stmt, sqlair.M{"uuid": uuid}).Run()
+	})
+}

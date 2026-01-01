@@ -374,6 +374,23 @@ paths:
           description: Ok
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+    delete:
+      description: Delete a device
+      operationId: deleteDevice
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the device to delete
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Device deleted successfully
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /sessions:
     get:
       summary: Get connected sessions

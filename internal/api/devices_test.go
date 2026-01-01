@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,5 +209,48 @@ func TestPatchDevice(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.NotEqual(t, http.StatusOK, resp.StatusCode)
+	})
+}
+
+func TestDeleteDevice(t *testing.T) {
+	store, ts, cleanup := setupTest()
+	defer cleanup()
+
+	ctx := context.Background()
+
+	t.Run("delete existing device", func(t *testing.T) {
+		// Create a channel and device
+		ch, err := store.CreateChannel(ctx, "delete-test-channel", nil)
+		require.NoError(t, err)
+
+		deviceUUID := uuid.MustParse("d0000004-0000-0000-0000-000000000004")
+		_, err = store.LoginDevice(ctx, deviceUUID, "192.168.1.50")
+		require.NoError(t, err)
+
+		d, err := store.GetDeviceByUUID(ctx, deviceUUID)
+		require.NoError(t, err)
+		d.ChannelUUID = ch.UUID
+		err = store.ModifyDevice(ctx, d)
+		require.NoError(t, err)
+
+		// Delete the device
+		resp := doRequest(ts, "DELETE", "/devices/"+deviceUUID.String(), "")
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// Verify device is gone
+		resp = doRequest(ts, "GET", "/devices/"+deviceUUID.String(), "")
+		defer resp.Body.Close()
+		assert.NotEqual(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("delete non-existent device", func(t *testing.T) {
+		// Deleting a non-existent device should still succeed (idempotent)
+		resp := doRequest(ts, "DELETE", "/devices/00000000-0000-0000-0000-000000000099", "")
+		defer resp.Body.Close()
+
+		// SQLite DELETE doesn't error on missing rows
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }

@@ -182,3 +182,31 @@ func (s *Server) PatchDevice(ctx context.Context, request PatchDeviceRequestObje
 	}
 	return PatchDevice200Response{}, nil
 }
+
+func (s *Server) DeleteDevice(ctx context.Context, request DeleteDeviceRequestObject) (DeleteDeviceResponseObject, error) {
+	// Check if device is currently connected
+	if s.hub != nil {
+		for _, sess := range s.hub.GetSessions() {
+			if sess.DeviceUUID == request.UUID {
+				return DeleteDevicedefaultJSONResponse{
+						Body: Error{
+							Code:    http.StatusConflict,
+							Message: "Cannot delete device while it is connected",
+						},
+						StatusCode: http.StatusConflict,
+					},
+					nil
+			}
+		}
+	}
+
+	err := s.store.DeleteDevice(ctx, request.UUID)
+	if err != nil {
+		return DeleteDevicedefaultJSONResponse{
+				Body:       RenderError(err),
+				StatusCode: StatusCode(err),
+			},
+			nil
+	}
+	return DeleteDevice200Response{}, nil
+}

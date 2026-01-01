@@ -72,9 +72,6 @@ function SortableAppletItem({ applet, onEdit, onDelete, deleting }: SortableAppl
         <div className="text-sm font-medium text-slate-200 truncate">
           {applet['app-id']}
         </div>
-        <div className="text-xs text-slate-500">
-          Position: {applet.idx ?? 0}
-        </div>
       </div>
 
       <div className="flex items-center gap-1">
