@@ -43,6 +43,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 	c.conn = conn
 
+	// Increase read limit for large animated WebP images (default is 32KB)
+	c.conn.SetReadLimit(256 * 1024) // 256KB
+
 	// Start the read loop
 	go c.readLoop(ctx)
 

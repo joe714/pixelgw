@@ -68,7 +68,7 @@ export function AddAppletModal({ open, onOpenChange, channelUuid, nextIdx }: Add
           setSelectedApplet(response.data)
           // Initialize config with defaults
           const defaults: Record<string, string> = {}
-          response.data.schema?.fields?.forEach((field) => {
+          response.data.schema?.schema?.forEach((field) => {
             if (field.id && field.default) {
               defaults[field.id] = field.default
             }

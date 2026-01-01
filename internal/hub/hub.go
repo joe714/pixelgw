@@ -71,7 +71,7 @@ func (h *Hub) appletsFromConfig(cfg *durable.Channel) ([]AppConfig, error) {
 					cfg.Name,
 					app.AppID,
 					app.Idx,
-					app.Config,
+					*app.Config,
 					err)
 				continue
 			}

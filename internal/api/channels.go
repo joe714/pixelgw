@@ -133,7 +133,14 @@ func (s *Server) CreateChannelApplet(ctx context.Context, request CreateChannelA
 	}
 
 	if request.Body.Config != nil {
-		cfg := string(request.Body.Config)
+		var cfg string
+		if err := json.Unmarshal(request.Body.Config, &cfg); err != nil {
+			return CreateChannelApplet400JSONResponse{
+					Code:    http.StatusBadRequest,
+					Message: "Invalid config JSON",
+				},
+				nil
+		}
 		app.Config = &cfg
 	}
 
@@ -174,7 +181,14 @@ func (s *Server) PatchChannelApplet(ctx context.Context, request PatchChannelApp
 	idx := request.Body.Idx
 	var cfg *string
 	if request.Body.Config != nil {
-		tmp := string(request.Body.Config)
+		var tmp string
+		if err := json.Unmarshal(request.Body.Config, &tmp); err != nil {
+			return PatchChannelAppletdefaultJSONResponse{
+					Body:       RenderError(err),
+					StatusCode: StatusCode(err),
+				},
+				nil
+		}
 		cfg = &tmp
 	}
 	err := s.store.ModifyChannelApplet(ctx, request.ChannelUUID, request.AppletUUID, idx, cfg)
