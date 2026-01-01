@@ -1,4 +1,4 @@
-FROM golang:1.22-bullseye AS stage1
+FROM golang:1.24-bullseye AS stage1
 # Build a base image that pre-caches the extra tools we need. In particular,
 # sqlite3 can take a minute or two we'd like to avoid if possible.
 #

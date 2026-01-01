@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom"
 
 import App from './App.tsx'
 import { ChannelList, channelListLoader } from "@/pages/channel-list"
+import { ChannelDetail, channelDetailLoader } from "@/pages/channel-detail"
 import { DevicesList, devicesLoader } from "@/pages/devices"
 import { AppletsList, appletsLoader } from "@/pages/applets"
 import { PixelDisplayDebug } from "@/pages/pixel-display-debug"
@@ -19,6 +20,11 @@ const router = createBrowserRouter([
         index: true,
 	element: <ChannelList />,
 	loader: channelListLoader,
+      },
+      {
+        path: "channels/:uuid",
+        element: <ChannelDetail />,
+        loader: channelDetailLoader,
       },
       {
         path: "devices",

@@ -55,6 +55,40 @@ paths:
                 $ref: '#/components/schemas/Error'
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+  /applets/{id}/render:
+    get:
+      summary: Render an applet with config
+      description: Renders an applet with the provided configuration and returns a WebP image
+      operationId: renderApplet
+      parameters:
+        - name: id
+          in: path
+          description: ID of the app to render
+          required: true
+          schema:
+            type: string
+        - name: config
+          in: query
+          description: JSON configuration for the applet
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rendered WebP image
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /channels:
     get:
       description: Returns the list of channels.

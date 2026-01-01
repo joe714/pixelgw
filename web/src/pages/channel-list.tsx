@@ -1,11 +1,12 @@
 import { makeLoader, useLoaderData } from "react-router-typesafe"
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
-import { SquarePlus, Settings } from 'lucide-react'
+import { SquarePlus, Settings, ChevronRight } from 'lucide-react'
 
 import { restClient } from '@/rest-client'
 import type { components } from '@/openapi'
@@ -143,7 +144,7 @@ export function ChannelList() {
       
       <div className="grid gap-4">
         {data.map((channel) => (
-          <div key={channel.uuid} className="border rounded-lg p-6 bg-card">
+          <div key={channel.uuid} className="border rounded-lg p-6 bg-card hover:border-slate-600 transition-colors">
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between mb-4">
@@ -155,17 +156,27 @@ export function ChannelList() {
                       {channel.comment || 'No description'}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfigModal({ open: true, channel })}
-                    className="ml-4 flex-shrink-0"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span className="sr-only">Configure {channel.name}</span>
-                  </Button>
+                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setConfigModal({ open: true, channel })
+                      }}
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span className="sr-only">Configure {channel.name}</span>
+                    </Button>
+                    <Link to={`/channels/${channel.uuid}`}>
+                      <Button variant="outline" size="sm">
+                        Manage
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-                
+
                 <div className="space-y-4 text-sm">
                   <div>
                     <div className="font-medium text-slate-400 mb-2">Applets</div>

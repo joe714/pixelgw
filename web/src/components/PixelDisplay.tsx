@@ -132,13 +132,12 @@ export const PixelDisplay: React.FC<PixelDisplayProps> = ({
           />
         )}
 
-        {/* LED matrix overlay - creates black borders with circular LED cutouts */}
-        <div 
+        {/* LED matrix overlay - creates black grid with circular LED cutouts */}
+        <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: `radial-gradient(circle ${Math.floor((scale - 3) / 2)}px at ${Math.floor(scale / 2)}px ${Math.floor(scale / 2)}px, transparent ${Math.floor((scale - 3) / 2)}px, black ${Math.floor((scale - 3) / 2) + 1}px)`,
+            backgroundImage: `radial-gradient(circle at center, transparent 0%, transparent 35%, black 45%, black 100%)`,
             backgroundSize: `${scale}px ${scale}px`,
-            backgroundPosition: `0px 0px`,
             backgroundRepeat: 'repeat',
           }}
         />

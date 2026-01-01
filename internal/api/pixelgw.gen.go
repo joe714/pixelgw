@@ -186,6 +186,12 @@ type GetAppletsParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
 }
 
+// RenderAppletParams defines parameters for RenderApplet.
+type RenderAppletParams struct {
+	// Config JSON configuration for the applet
+	Config *string `form:"config,omitempty" json:"config,omitempty"`
+}
+
 // PatchChannelAppletJSONBody defines parameters for PatchChannelApplet.
 type PatchChannelAppletJSONBody struct {
 	// Config Applet configuration
@@ -223,6 +229,9 @@ type ServerInterface interface {
 	// Get the details of an app
 	// (GET /applets/{id})
 	GetAppletByID(w http.ResponseWriter, r *http.Request, id string)
+	// Render an applet with config
+	// (GET /applets/{id}/render)
+	RenderApplet(w http.ResponseWriter, r *http.Request, id string, params RenderAppletParams)
 
 	// (GET /channels)
 	GetChannels(w http.ResponseWriter, r *http.Request)
@@ -309,6 +318,43 @@ func (siw *ServerInterfaceWrapper) GetAppletByID(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAppletByID(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// RenderApplet operation middleware
+func (siw *ServerInterfaceWrapper) RenderApplet(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RenderAppletParams
+
+	// ------------- Optional query parameter "config" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "config", r.URL.Query(), &params.Config)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "config", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenderApplet(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -668,6 +714,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/applets", wrapper.GetApplets)
 	m.HandleFunc("GET "+options.BaseURL+"/applets/{id}", wrapper.GetAppletByID)
+	m.HandleFunc("GET "+options.BaseURL+"/applets/{id}/render", wrapper.RenderApplet)
 	m.HandleFunc("GET "+options.BaseURL+"/channels", wrapper.GetChannels)
 	m.HandleFunc("POST "+options.BaseURL+"/channels", wrapper.CreateChannel)
 	m.HandleFunc("POST "+options.BaseURL+"/channels/{channelUUID}/applets", wrapper.CreateChannelApplet)
@@ -745,6 +792,55 @@ type GetAppletByIDdefaultJSONResponse struct {
 }
 
 func (response GetAppletByIDdefaultJSONResponse) VisitGetAppletByIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type RenderAppletRequestObject struct {
+	Id     string `json:"id"`
+	Params RenderAppletParams
+}
+
+type RenderAppletResponseObject interface {
+	VisitRenderAppletResponse(w http.ResponseWriter) error
+}
+
+type RenderApplet200ImagewebpResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response RenderApplet200ImagewebpResponse) VisitRenderAppletResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "image/webp")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type RenderApplet404JSONResponse Error
+
+func (response RenderApplet404JSONResponse) VisitRenderAppletResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RenderAppletdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RenderAppletdefaultJSONResponse) VisitRenderAppletResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -1085,6 +1181,9 @@ type StrictServerInterface interface {
 	// Get the details of an app
 	// (GET /applets/{id})
 	GetAppletByID(ctx context.Context, request GetAppletByIDRequestObject) (GetAppletByIDResponseObject, error)
+	// Render an applet with config
+	// (GET /applets/{id}/render)
+	RenderApplet(ctx context.Context, request RenderAppletRequestObject) (RenderAppletResponseObject, error)
 
 	// (GET /channels)
 	GetChannels(ctx context.Context, request GetChannelsRequestObject) (GetChannelsResponseObject, error)
@@ -1191,6 +1290,33 @@ func (sh *strictHandler) GetAppletByID(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAppletByIDResponseObject); ok {
 		if err := validResponse.VisitGetAppletByIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RenderApplet operation middleware
+func (sh *strictHandler) RenderApplet(w http.ResponseWriter, r *http.Request, id string, params RenderAppletParams) {
+	var request RenderAppletRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RenderApplet(ctx, request.(RenderAppletRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RenderApplet")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RenderAppletResponseObject); ok {
+		if err := validResponse.VisitRenderAppletResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1483,37 +1609,39 @@ func (sh *strictHandler) GetSessions(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
