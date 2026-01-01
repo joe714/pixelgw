@@ -214,7 +214,11 @@ func runHeadless(device *pixelclient.Device, timeoutSec int, verbose bool) {
 	frameCount := 0
 	for {
 		select {
-		case data := <-client.Frames():
+		case data, ok := <-client.Frames():
+			if !ok {
+				fmt.Println("Connection closed")
+				return
+			}
 			frameCount++
 			animFrames := countWebPFrames(data)
 			if animFrames > 1 {
@@ -222,11 +226,14 @@ func runHeadless(device *pixelclient.Device, timeoutSec int, verbose bool) {
 			} else {
 				fmt.Printf("Frame %d: %s bytes\n", frameCount, formatNumber(len(data)))
 			}
-			if verbose {
+			if verbose && len(data) > 0 {
 				fmt.Printf("[verbose] WebP data: first 16 bytes: %x\n", data[:min(16, len(data))])
 			}
 
-		case err := <-client.Errors():
+		case err, ok := <-client.Errors():
+			if !ok {
+				return
+			}
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return
 

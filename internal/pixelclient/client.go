@@ -51,7 +51,11 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // readLoop reads messages from the WebSocket connection.
 func (c *Client) readLoop(ctx context.Context) {
-	defer close(c.done)
+	defer func() {
+		close(c.done)
+		close(c.frames)
+		close(c.errors)
+	}()
 
 	for {
 		msgType, data, err := c.conn.Read(ctx)
@@ -65,15 +69,27 @@ func (c *Client) readLoop(ctx context.Context) {
 
 		// We only care about binary messages (WebP images)
 		if msgType == websocket.MessageBinary {
+			// Non-blocking send, dropping old frame if buffer is full
 			select {
 			case c.frames <- data:
 			default:
-				// Drop frame if channel is full (keep latest)
-				select {
-				case <-c.frames:
-				default:
+				// Drain and replace atomically using a loop
+				for {
+					select {
+					case <-c.frames:
+						// Drained one, try to send again
+					default:
+						// Channel is empty now, but might have been read by consumer
+					}
+					select {
+					case c.frames <- data:
+						// Successfully sent
+						goto sent
+					default:
+						// Still full, loop to drain again
+					}
 				}
-				c.frames <- data
+			sent:
 			}
 		}
 	}

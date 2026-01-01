@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -18,14 +19,6 @@ const (
 	ViewConnecting
 	ViewDisplay
 	ViewCreateDevice
-)
-
-// InputField tracks which field is being edited in create device view
-type InputField int
-
-const (
-	FieldName InputField = iota
-	FieldServer
 )
 
 // Model is the Bubbletea model for the application
@@ -41,10 +34,10 @@ type Model struct {
 	showCreateNew bool
 
 	// Create device state
-	inputField   InputField
-	inputName    string
-	inputServer  string
-	createError  string
+	nameInput   textinput.Model
+	serverInput textinput.Model
+	focusIndex  int // 0 = name, 1 = server
+	createError string
 
 	// Display state
 	device      *Device
@@ -76,12 +69,25 @@ type Model struct {
 func NewModel(config *Config, initialDevice *Device) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Initialize text inputs
+	nameInput := textinput.New()
+	nameInput.Placeholder = "my-device"
+	nameInput.CharLimit = 64
+	nameInput.Width = 30
+
+	serverInput := textinput.New()
+	serverInput.Placeholder = "192.168.1.100:8080"
+	serverInput.CharLimit = 64
+	serverInput.Width = 30
+
 	m := Model{
-		config:   config,
-		view:     ViewSelection,
-		renderer: NewRenderer(80, 24),
-		ctx:      ctx,
-		cancel:   cancel,
+		config:      config,
+		view:        ViewSelection,
+		renderer:    NewRenderer(80, 24),
+		ctx:         ctx,
+		cancel:      cancel,
+		nameInput:   nameInput,
+		serverInput: serverInput,
 	}
 
 	if initialDevice != nil {
@@ -89,6 +95,7 @@ func NewModel(config *Config, initialDevice *Device) Model {
 		m.view = ViewConnecting
 	} else if len(config.Devices) == 0 {
 		m.view = ViewCreateDevice
+		m.nameInput.Focus()
 	}
 
 	return m
@@ -292,9 +299,11 @@ func (m Model) handleSelectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			// Selected "Create new"
 			m.view = ViewCreateDevice
-			m.inputField = FieldName
-			m.inputName = ""
-			m.inputServer = ""
+			m.focusIndex = 0
+			m.nameInput.Reset()
+			m.serverInput.Reset()
+			m.nameInput.Focus()
+			m.serverInput.Blur()
 			m.createError = ""
 		}
 	}
@@ -344,33 +353,45 @@ func (m Model) handleCreateDeviceKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			return m, tea.Quit
 		}
+		return m, nil
 
 	case "tab", "down":
-		if m.inputField == FieldName {
-			m.inputField = FieldServer
+		m.focusIndex = (m.focusIndex + 1) % 2
+		if m.focusIndex == 0 {
+			m.nameInput.Focus()
+			m.serverInput.Blur()
 		} else {
-			m.inputField = FieldName
+			m.nameInput.Blur()
+			m.serverInput.Focus()
 		}
+		return m, nil
 
 	case "shift+tab", "up":
-		if m.inputField == FieldServer {
-			m.inputField = FieldName
+		m.focusIndex = (m.focusIndex + 1) % 2
+		if m.focusIndex == 0 {
+			m.nameInput.Focus()
+			m.serverInput.Blur()
 		} else {
-			m.inputField = FieldServer
+			m.nameInput.Blur()
+			m.serverInput.Focus()
 		}
+		return m, nil
 
 	case "enter":
 		// Validate and create device
-		if m.inputName == "" {
+		name := m.nameInput.Value()
+		server := m.serverInput.Value()
+
+		if name == "" {
 			m.createError = "Name is required"
 			return m, nil
 		}
-		if m.inputServer == "" {
+		if server == "" {
 			m.createError = "Server is required"
 			return m, nil
 		}
 
-		device, err := m.config.AddDevice(m.inputName, m.inputServer, "")
+		device, err := m.config.AddDevice(name, server, "")
 		if err != nil {
 			m.createError = err.Error()
 			return m, nil
@@ -385,28 +406,17 @@ func (m Model) handleCreateDeviceKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.view = ViewConnecting
 		m.status = fmt.Sprintf("Connecting to %s...", m.device.Server)
 		return m, m.connectCmd()
-
-	case "backspace":
-		if m.inputField == FieldName && len(m.inputName) > 0 {
-			m.inputName = m.inputName[:len(m.inputName)-1]
-		} else if m.inputField == FieldServer && len(m.inputServer) > 0 {
-			m.inputServer = m.inputServer[:len(m.inputServer)-1]
-		}
-		m.createError = ""
-
-	default:
-		// Add character to current field
-		if len(msg.String()) == 1 {
-			if m.inputField == FieldName {
-				m.inputName += msg.String()
-			} else {
-				m.inputServer += msg.String()
-			}
-			m.createError = ""
-		}
 	}
 
-	return m, nil
+	// Pass other keys to the focused input
+	m.createError = ""
+	var cmd tea.Cmd
+	if m.focusIndex == 0 {
+		m.nameInput, cmd = m.nameInput.Update(msg)
+	} else {
+		m.serverInput, cmd = m.serverInput.Update(msg)
+	}
+	return m, cmd
 }
 
 // View renders the UI
@@ -557,34 +567,22 @@ func (m Model) viewCreateDevice() string {
 
 	// Name field
 	nameLabel := "Name:   "
-	nameStyle := inputInactiveStyle
-	if m.inputField == FieldName {
-		nameStyle = inputActiveStyle
-		nameLabel = "> " + nameLabel
+	if m.focusIndex == 0 {
+		sb.WriteString(inputActiveStyle.Render("> " + nameLabel))
 	} else {
-		nameLabel = "  " + nameLabel
+		sb.WriteString(inputInactiveStyle.Render("  " + nameLabel))
 	}
-	sb.WriteString(nameStyle.Render(nameLabel))
-	sb.WriteString(m.inputName)
-	if m.inputField == FieldName {
-		sb.WriteString("_")
-	}
+	sb.WriteString(m.nameInput.View())
 	sb.WriteString("\n")
 
 	// Server field
 	serverLabel := "Server: "
-	serverStyle := inputInactiveStyle
-	if m.inputField == FieldServer {
-		serverStyle = inputActiveStyle
-		serverLabel = "> " + serverLabel
+	if m.focusIndex == 1 {
+		sb.WriteString(inputActiveStyle.Render("> " + serverLabel))
 	} else {
-		serverLabel = "  " + serverLabel
+		sb.WriteString(inputInactiveStyle.Render("  " + serverLabel))
 	}
-	sb.WriteString(serverStyle.Render(serverLabel))
-	sb.WriteString(m.inputServer)
-	if m.inputField == FieldServer {
-		sb.WriteString("_")
-	}
+	sb.WriteString(m.serverInput.View())
 	sb.WriteString("\n")
 
 	// Error message
