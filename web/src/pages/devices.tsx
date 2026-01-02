@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { makeLoader, useLoaderData } from "react-router-typesafe"
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Monitor, Wifi, WifiOff, Plus } from 'lucide-react'
+import { Monitor, Wifi, WifiOff } from 'lucide-react'
 import { restClient } from '@/rest-client'
 import { DeviceConfigModal } from '@/components/DeviceConfigModal'
 
@@ -91,12 +90,8 @@ export function DevicesList() {
   return (
     <>
       <div className="flex flex-col p-4">
-        <div className="flex flex-row justify-between items-center mb-4">
+        <div className="mb-4">
           <h2 className="text-2xl font-bold text-white">Devices</h2>
-          <Button variant="ghost" className="p-2 space-x-1 bg-lime-700">
-            <Plus className="h-4 w-4" />
-            <Label className="font-bold">Add Device</Label>
-          </Button>
         </div>
         <div>
           {devices && devices.length > 0 ? (

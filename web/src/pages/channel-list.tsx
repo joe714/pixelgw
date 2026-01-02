@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import { makeLoader, useLoaderData } from "react-router-typesafe"
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useRevalidator } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
-import { SquarePlus, Settings } from 'lucide-react'
+import { Plus, Settings } from 'lucide-react'
 
 import { restClient } from '@/rest-client'
 import type { components } from '@/openapi'
@@ -34,6 +44,41 @@ export const channelListLoader = makeLoader(
 
 export function ChannelList() {
   const data = useLoaderData<typeof channelListLoader>();
+  const navigate = useNavigate()
+  const revalidator = useRevalidator()
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [channelName, setChannelName] = useState('')
+  const [channelComment, setChannelComment] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const handleCreateChannel = async () => {
+    if (!channelName.trim()) return
+
+    setCreating(true)
+    try {
+      const response = await restClient.POST('/channels', {
+        body: {
+          name: channelName.trim(),
+          comment: channelComment.trim() || undefined,
+        },
+      })
+      if (response.data?.uuid) {
+        setCreateModalOpen(false)
+        setChannelName('')
+        setChannelComment('')
+        navigate(`/channels/${response.data.uuid}`)
+      } else {
+        revalidator.revalidate()
+        setCreateModalOpen(false)
+        setChannelName('')
+        setChannelComment('')
+      }
+    } catch (error) {
+      console.error('Failed to create channel:', error)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const renderDeviceList = (items: ChannelDetail['subscribers'], maxDisplay: number = 5) => {
     if (!items || items.length === 0) {
@@ -84,16 +129,19 @@ export function ChannelList() {
   }
 
   return (
+    <>
     <div className="flex flex-col p-4">
       <div className="flex flex-row justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Channels</h1>
-        <Button variant="ghost" className="p-2 space-x-1 bg-lime-700">
-          <span className="sr-only">New Channel</span>
-          <SquarePlus className="h-4 w-4" />
-          <Label className="font-bold">New</Label>
+        <Button
+          className="bg-lime-700 hover:bg-lime-600"
+          onClick={() => setCreateModalOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Channel
         </Button>
       </div>
-      
+
       <div className="grid gap-4">
         {data.map((channel) => (
           <div key={channel.uuid} className="border rounded-lg p-6 bg-card hover:border-slate-600 transition-colors">
@@ -134,5 +182,55 @@ export function ChannelList() {
         ))}
       </div>
     </div>
+
+    {/* Create Channel Modal */}
+    <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Create Channel</DialogTitle>
+          <DialogDescription>
+            Create a new channel to group applets and devices.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="channel-name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="channel-name"
+              value={channelName}
+              onChange={(e) => setChannelName(e.target.value)}
+              className="col-span-3"
+              placeholder="My Channel"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="channel-comment" className="text-right">
+              Description
+            </Label>
+            <Input
+              id="channel-comment"
+              value={channelComment}
+              onChange={(e) => setChannelComment(e.target.value)}
+              className="col-span-3"
+              placeholder="Optional description"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateChannel}
+            disabled={creating || !channelName.trim()}
+          >
+            {creating ? 'Creating...' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
