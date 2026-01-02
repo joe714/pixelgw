@@ -1,10 +1,43 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { PixelDisplay } from '@/components/PixelDisplay'
 import { usePixelWebSocket } from '@/hooks/usePixelWebSocket'
 
+// Native display resolution
+const NATIVE_WIDTH = 64
+const NATIVE_HEIGHT = 32
+
+// Frame adds padding: p-4 (16px each side) + border (2px each side) + bezel padding (4px each side)
+// Plus LED area (~24px) and branding (~24px) at top/bottom
+const FRAME_PADDING_X = 16 + 2 + 4  // 22px each side = 44px total
+const FRAME_PADDING_Y = 16 + 2 + 4 + 24 + 24  // ~70px total
+
 export default function VirtualDisplayPage() {
   const { mode, uuid } = useParams<{ mode: 'channel' | 'device'; uuid: string }>()
+  const [scale, setScale] = useState(8)
+
+  // Calculate optimal scale to fill viewport
+  const calculateScale = useCallback(() => {
+    // Leave some margin around the display
+    const margin = 32
+    const availableWidth = window.innerWidth - margin * 2
+    const availableHeight = window.innerHeight - margin * 2 - 60 // 60px for status bar
+
+    // Calculate max scale that fits both dimensions
+    const maxScaleX = Math.floor((availableWidth - FRAME_PADDING_X * 2) / NATIVE_WIDTH)
+    const maxScaleY = Math.floor((availableHeight - FRAME_PADDING_Y) / NATIVE_HEIGHT)
+
+    // Use the smaller of the two, with a minimum of 4 and maximum of 16
+    const optimalScale = Math.max(4, Math.min(16, Math.min(maxScaleX, maxScaleY)))
+    setScale(optimalScale)
+  }, [])
+
+  // Calculate scale on mount and window resize
+  useEffect(() => {
+    calculateScale()
+    window.addEventListener('resize', calculateScale)
+    return () => window.removeEventListener('resize', calculateScale)
+  }, [calculateScale])
 
   // Build WebSocket URL based on mode
   const wsUrl = useMemo(() => {
@@ -26,7 +59,7 @@ export default function VirtualDisplayPage() {
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
       <PixelDisplay
         src={imageUrl || ''}
-        scale={8}
+        scale={scale}
         showFrame={true}
         frameTheme="black"
         powerOn={connected}
