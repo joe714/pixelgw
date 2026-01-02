@@ -125,6 +125,25 @@ func (s *Server) PatchChannel(ctx context.Context, request PatchChannelRequestOb
 	return PatchChannel200Response{}, nil
 }
 
+func (s *Server) DeleteChannel(ctx context.Context, request DeleteChannelRequestObject) (DeleteChannelResponseObject, error) {
+	err := s.store.DeleteChannel(ctx, request.UUID)
+	if err != nil {
+		if err.Error() == "channel has subscribers" {
+			return DeleteChannel409JSONResponse{
+					Code:    http.StatusConflict,
+					Message: "Channel has devices subscribed and cannot be deleted",
+				},
+				nil
+		}
+		return DeleteChanneldefaultJSONResponse{
+				Body:       RenderError(err),
+				StatusCode: StatusCode(err),
+			},
+			nil
+	}
+	return DeleteChannel200Response{}, nil
+}
+
 func (s *Server) CreateChannelApplet(ctx context.Context, request CreateChannelAppletRequestObject) (CreateChannelAppletResponseObject, error) {
 	app := durable.ChannelApplet{
 		Idx:   -1,

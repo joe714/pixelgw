@@ -236,6 +236,29 @@ paths:
           description: Channel updated successfully
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+    delete:
+      description: Delete a channel
+      operationId: deleteChannel
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the channel to delete
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Channel deleted successfully
+        '409':
+          description: Channel has subscribers and cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /channels/{uuid}/push:
     post:
       summary: Push temporary content to channel

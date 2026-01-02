@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useRevalidator } from 'react-router-dom'
+import { useParams, Link, useRevalidator, useNavigate } from 'react-router-dom'
 import { makeLoader, useLoaderData } from 'react-router-typesafe'
-import { ArrowLeft, Plus, RefreshCw, Pencil } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { PixelDisplay } from '@/components/PixelDisplay'
 import { ChannelAppletList } from '@/components/ChannelAppletList'
 import { AddAppletModal } from '@/components/AddAppletModal'
@@ -47,6 +56,7 @@ export function ChannelDetail() {
   const { channel } = useLoaderData<typeof channelDetailLoader>()
   const { uuid } = useParams()
   const revalidator = useRevalidator()
+  const navigate = useNavigate()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editModal, setEditModal] = useState<{ open: boolean; applet: AppInstanceDetail | null }>({
     open: false,
@@ -56,6 +66,8 @@ export function ChannelDetail() {
   const [channelName, setChannelName] = useState(channel?.name || '')
   const [channelComment, setChannelComment] = useState(channel?.comment || '')
   const [saving, setSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKey, setPreviewKey] = useState(0)
 
@@ -109,6 +121,26 @@ export function ChannelDetail() {
       setSaving(false)
     }
   }
+
+  const handleDeleteChannel = async () => {
+    if (!uuid) return
+
+    setDeleting(true)
+    try {
+      await restClient.DELETE('/channels/{uuid}', {
+        params: { path: { uuid } },
+      })
+      setShowDeleteConfirm(false)
+      setEditChannelModal(false)
+      navigate('/')
+    } catch (error) {
+      console.error('Failed to delete channel:', error)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const hasSubscribers = (channel?.subscribers?.length ?? 0) > 0
 
   if (!channel) {
     return (
@@ -256,16 +288,49 @@ export function ChannelDetail() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditChannelModal(false)}>
-              Cancel
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={hasSubscribers}
+              title={hasSubscribers ? 'Remove all devices from this channel before deleting' : 'Delete this channel'}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Channel
             </Button>
-            <Button onClick={handleSaveChannel} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditChannelModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveChannel} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Channel Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Channel</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{channel?.name}"? This will also remove all applets configured for this channel. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteChannel}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

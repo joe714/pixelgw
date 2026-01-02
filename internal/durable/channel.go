@@ -268,6 +268,46 @@ func (store *Store) DeleteChannelApplet(ctx context.Context, channelUUID uuid.UU
 	return err
 }
 
+func (store *Store) DeleteChannel(ctx context.Context, channelUUID uuid.UUID) error {
+	log.Printf("Delete channel %v\n", channelUUID)
+	err := store.Update(ctx, func(tx *TX) error {
+		// Check if channel has any subscribers (devices)
+		m := sqlair.M{"channel_uuid": channelUUID}
+		countStmt := sqlair.MustPrepare(
+			`SELECT count(*) AS &M.count FROM devices WHERE channel_uuid = $M.channel_uuid`,
+			sqlair.M{})
+		result := sqlair.M{}
+		err := tx.Query(countStmt, m).Get(&result)
+		if err != nil {
+			return err
+		}
+		if result["count"].(int64) > 0 {
+			return ne.New("channel has subscribers")
+		}
+
+		// Delete all applets for this channel first
+		deleteAppletsStmt := sqlair.MustPrepare(
+			`DELETE FROM channel_applets WHERE channel_uuid = $M.channel_uuid`,
+			sqlair.M{})
+		err = tx.Query(deleteAppletsStmt, m).Run()
+		if err != nil {
+			return err
+		}
+
+		// Delete the channel
+		deleteChannelStmt := sqlair.MustPrepare(
+			`DELETE FROM channels WHERE uuid = $M.channel_uuid`,
+			sqlair.M{})
+		err = tx.Query(deleteChannelStmt, m).Run()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	return err
+}
+
 func (store *Store) ModifyChannelApplet(ctx context.Context, channelUUID uuid.UUID, appletUUID uuid.UUID, idx *int, cfg *string) error {
 
 	err := store.Update(ctx, func(tx *TX) error {
