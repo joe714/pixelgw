@@ -3,7 +3,9 @@ package api
 import (
 	"bytes"
 	"encoding/binary"
+	"mime/multipart"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -265,4 +267,65 @@ func TestGetWebPDimensions(t *testing.T) {
 func TestValidationError(t *testing.T) {
 	err := &validationError{"test message"}
 	assert.Equal(t, "test message", err.Error())
+}
+
+func TestParseMultipartPush(t *testing.T) {
+	t.Run("negative duration rejected", func(t *testing.T) {
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+
+		// Add valid image
+		imagePart, _ := writer.CreateFormFile("image", "test.webp")
+		imagePart.Write(createTestWebP(64, 32))
+
+		// Add negative duration
+		durationPart, _ := writer.CreateFormField("duration")
+		durationPart.Write([]byte("-5"))
+
+		writer.Close()
+
+		reader := multipart.NewReader(body, writer.Boundary())
+		_, _, err := parseMultipartPush(reader)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "negative")
+	})
+
+	t.Run("zero duration accepted", func(t *testing.T) {
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+
+		imagePart, _ := writer.CreateFormFile("image", "test.webp")
+		imagePart.Write(createTestWebP(64, 32))
+
+		durationPart, _ := writer.CreateFormField("duration")
+		durationPart.Write([]byte("0"))
+
+		writer.Close()
+
+		reader := multipart.NewReader(body, writer.Boundary())
+		_, duration, err := parseMultipartPush(reader)
+
+		assert.NoError(t, err)
+		assert.Equal(t, time.Duration(0), duration)
+	})
+
+	t.Run("positive duration accepted", func(t *testing.T) {
+		body := new(bytes.Buffer)
+		writer := multipart.NewWriter(body)
+
+		imagePart, _ := writer.CreateFormFile("image", "test.webp")
+		imagePart.Write(createTestWebP(64, 32))
+
+		durationPart, _ := writer.CreateFormField("duration")
+		durationPart.Write([]byte("30"))
+
+		writer.Close()
+
+		reader := multipart.NewReader(body, writer.Boundary())
+		_, duration, err := parseMultipartPush(reader)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 30*time.Second, duration)
+	})
 }

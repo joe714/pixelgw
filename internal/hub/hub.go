@@ -15,6 +15,7 @@ import (
 
 	"github.com/joe714/pixelgw/internal/catalog"
 	"github.com/joe714/pixelgw/internal/durable"
+	ne "github.com/joe714/pixelgw/internal/errors"
 )
 
 type SessionInfo struct {
@@ -326,7 +327,7 @@ func (h *Hub) PushToDevice(deviceUUID uuid.UUID, image []byte, duration time.Dur
 	return RunTask(h.tasks, func() error {
 		client, _ := h.findClientByDevice(deviceUUID)
 		if client == nil {
-			return errors.New("device not connected")
+			return ne.DeviceNotConnected
 		}
 
 		// Set override on the client
@@ -369,7 +370,7 @@ func (h *Hub) ClearDevicePush(deviceUUID uuid.UUID) error {
 	return RunTask(h.tasks, func() error {
 		client, channel := h.findClientByDevice(deviceUUID)
 		if client == nil {
-			return errors.New("device not connected")
+			return ne.DeviceNotConnected
 		}
 
 		// Clear the override

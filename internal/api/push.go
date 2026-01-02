@@ -294,7 +294,7 @@ func (s *Server) PushDeviceContent(ctx context.Context, request PushDeviceConten
 	// Push to device
 	err = s.hub.PushToDevice(request.UUID, imageData, duration)
 	if err != nil {
-		if err.Error() == "device not connected" {
+		if ne.Is(err, ne.DeviceNotConnected) {
 			return PushDeviceContent409JSONResponse{
 				Code:    http.StatusConflict,
 				Message: "Device not currently connected",
@@ -345,7 +345,7 @@ func (s *Server) ClearDevicePush(ctx context.Context, request ClearDevicePushReq
 	// Clear the override
 	err = s.hub.ClearDevicePush(request.UUID)
 	if err != nil {
-		if err.Error() == "device not connected" {
+		if ne.Is(err, ne.DeviceNotConnected) {
 			return ClearDevicePush409JSONResponse{
 				Code:    http.StatusConflict,
 				Message: "Device not currently connected",
@@ -374,24 +374,35 @@ func parseMultipartPush(reader *multipart.Reader) ([]byte, time.Duration, error)
 			return nil, 0, err
 		}
 
-		switch part.FormName() {
-		case "image":
-			imageData, err = io.ReadAll(io.LimitReader(part, maxImageSize+1))
-			if err != nil {
-				return nil, 0, err
+		err = func() error {
+			defer part.Close()
+
+			switch part.FormName() {
+			case "image":
+				data, err := io.ReadAll(io.LimitReader(part, maxImageSize+1))
+				if err != nil {
+					return err
+				}
+				imageData = data
+			case "duration":
+				data, err := io.ReadAll(part)
+				if err != nil {
+					return err
+				}
+				d, err := strconv.Atoi(string(data))
+				if err != nil {
+					return &validationError{"invalid duration value"}
+				}
+				if d < 0 {
+					return &validationError{"duration cannot be negative"}
+				}
+				duration = time.Duration(d) * time.Second
 			}
-		case "duration":
-			data, err := io.ReadAll(part)
-			if err != nil {
-				return nil, 0, err
-			}
-			d, err := strconv.Atoi(string(data))
-			if err != nil {
-				return nil, 0, &validationError{"invalid duration value"}
-			}
-			duration = time.Duration(d) * time.Second
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, err
 		}
-		part.Close()
 	}
 
 	if imageData == nil {

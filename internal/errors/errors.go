@@ -66,5 +66,6 @@ var (
 	ChannelExists      = New(1001, "channel exists")
 	ChannelNotFound    = New(1002, "channel not found")
 	DeviceNotFound     = New(1003, "device not found")
+	DeviceNotConnected = New(1004, "device not connected")
 	AppIndexOutOfRange = New(1011, "index out of range")
 )
