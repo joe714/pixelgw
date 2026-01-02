@@ -74,6 +74,30 @@ func (store *Store) ModifyDevice(ctx context.Context, device *Device) error {
 	return err
 }
 
+// CreateDevice creates a new device with the given name and channel
+func (store *Store) CreateDevice(ctx context.Context, name string, channelUUID uuid.UUID) (*Device, error) {
+	d := Device{
+		UUID:        uuid.New(),
+		Name:        name,
+		ChannelUUID: channelUUID,
+	}
+	err := store.Update(ctx, func(tx *TX) error {
+		stmt := sqlair.MustPrepare(
+			`INSERT INTO devices (uuid, name, channel_uuid)
+			 VALUES ($M.uuid, $M.name, $M.channel_uuid)`,
+			sqlair.M{})
+		return tx.Query(stmt, sqlair.M{
+			"uuid":         d.UUID,
+			"name":         d.Name,
+			"channel_uuid": d.ChannelUUID,
+		}).Run()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
 func (store *Store) LoginDevice(ctx context.Context, uuid uuid.UUID, remoteIP string) (*Device, error) {
 	d := Device{}
 	now := time.Now().UTC().Format(time.RFC3339)

@@ -43,6 +43,7 @@ func main() {
 
 	root.Handle("/", fs)
 	root.HandleFunc("/ws", hub.GetWsHandler())
+	root.HandleFunc("/ws/display", hub.GetVirtualDisplayHandler())
 	hdlr := api.NewStrictHandlerWithOptions(svr, middlewares, api.ServerOptions())
 	api.HandlerFromMuxWithBaseURL(hdlr, root, "/api")
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useRevalidator, useNavigate } from 'react-router-dom'
 import { makeLoader, useLoaderData } from 'react-router-typesafe'
-import { ArrowLeft, Plus, RefreshCw, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw, Pencil, Trash2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -209,6 +209,17 @@ export function ChannelDetail() {
             frameTheme="black"
             loading={!previewUrl}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => {
+              window.open(`/display/channel/${uuid}`, '_blank')
+            }}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open Virtual Display
+          </Button>
           <div className="mt-4 text-xs text-slate-500">
             <div>Devices: {channel.subscribers?.length || 0}</div>
             <div>Applets: {channel.applets?.length || 0}</div>

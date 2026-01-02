@@ -40,6 +40,8 @@ type Client struct {
 	SessionID     uint32
 	UUID          uuid.UUID
 	RealIP        string // The actual client IP (may differ from conn.RemoteAddr if proxied)
+	Ephemeral     bool   // True for ephemeral channel clients (virtual displays)
+	DisplayName   string // Human-readable name for virtual displays
 	hub           atomic.Pointer[Hub]
 	conn          *websocket.Conn
 	send          chan *ClientImage

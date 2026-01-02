@@ -457,6 +457,41 @@ paths:
                   $ref: '#/components/schemas/DeviceSummary'
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+    post:
+      summary: Create a new virtual device
+      description: Create a new virtual device that can be used with virtual displays
+      operationId: createDevice
+      requestBody:
+        description: Device to create
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - channel
+              properties:
+                name:
+                  type: string
+                  description: Name for the virtual device
+                channel:
+                  $ref: '#/components/schemas/ChannelRef'
+      responses:
+        '201':
+          description: Device created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSummary'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /devices/{uuid}:
     get:
       description: Get the details of a device
@@ -822,6 +857,13 @@ components:
           $ref: '#/components/schemas/ChannelRef'
         device:
           $ref: '#/components/schemas/DeviceRef'
+        ephemeral:
+          type: boolean
+          description: True if this is an ephemeral virtual display connection
+        display-name:
+          type: string
+          description: Human-readable display name for virtual displays
+          x-go-name: DisplayName
     Schema:
       type: object
       x-go-type: schema.Schema

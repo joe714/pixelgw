@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { makeLoader, useLoaderData } from "react-router-typesafe"
+import { useRevalidator } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Monitor, Wifi, WifiOff, Settings } from 'lucide-react'
+import { Monitor, Wifi, WifiOff, Settings, Plus } from 'lucide-react'
 import { restClient } from '@/rest-client'
 import { DeviceConfigModal } from '@/components/DeviceConfigModal'
+import { CreateVirtualDeviceModal } from '@/components/CreateVirtualDeviceModal'
 import type { components } from '@/openapi'
 
 type DeviceSummary = components['schemas']['DeviceSummary']
@@ -29,14 +31,27 @@ function formatLastSeen(timestamp: string | undefined): string {
 
 export function DevicesList() {
   const { data } = useLoaderData<typeof devicesLoader>();
+  const revalidator = useRevalidator()
   const [selectedDevice, setSelectedDevice] = useState<DeviceSummary | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  const handleDeviceCreated = (device: DeviceSummary) => {
+    // Open the virtual display in a new window
+    window.open(`/display/device/${device.uuid}`, '_blank')
+    // Refresh the device list
+    revalidator.revalidate()
+  }
 
   return (
     <>
       <div className="flex flex-col p-4">
-        <div className="mb-6">
+        <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Devices</h1>
+          <Button onClick={() => setCreateModalOpen(true)} className="bg-lime-700 hover:bg-lime-600">
+            <Plus className="h-4 w-4 mr-2" />
+            New Virtual Device
+          </Button>
         </div>
 
         {data && data.length > 0 ? (
@@ -125,6 +140,12 @@ export function DevicesList() {
           device={selectedDevice}
         />
       )}
+
+      <CreateVirtualDeviceModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onCreated={handleDeviceCreated}
+      />
     </>
   )
 }

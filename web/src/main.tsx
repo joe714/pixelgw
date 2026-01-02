@@ -8,10 +8,17 @@ import { ChannelDetail, channelDetailLoader } from "@/pages/channel-detail"
 import { DevicesList, devicesLoader } from "@/pages/devices"
 import { AppletsList, appletsLoader } from "@/pages/applets"
 import { PixelDisplayDebug } from "@/pages/pixel-display-debug"
+import VirtualDisplayPage from "@/pages/virtual-display"
 
 import './index.css'
 
 const router = createBrowserRouter([
+  // Virtual display routes (no layout chrome)
+  {
+    path: "/display/:mode/:uuid",
+    element: <VirtualDisplayPage />,
+  },
+  // Main app routes (with layout)
   {
     path: "/",
     element: <App />,

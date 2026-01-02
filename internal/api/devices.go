@@ -243,3 +243,58 @@ func (s *Server) DeleteDevice(ctx context.Context, request DeleteDeviceRequestOb
 	}
 	return DeleteDevice200Response{}, nil
 }
+
+func (s *Server) CreateDevice(ctx context.Context, request CreateDeviceRequestObject) (CreateDeviceResponseObject, error) {
+	// Validate request
+	if request.Body == nil {
+		return CreateDevice400JSONResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Request body is required",
+		}, nil
+	}
+
+	if request.Body.Name == "" {
+		return CreateDevice400JSONResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Device name is required",
+		}, nil
+	}
+
+	if request.Body.Channel.UUID == nil {
+		return CreateDevice400JSONResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Channel UUID is required",
+		}, nil
+	}
+
+	// Verify channel exists
+	ch, err := s.store.GetChannelByUUID(ctx, *request.Body.Channel.UUID)
+	if err != nil {
+		return CreateDevicedefaultJSONResponse{
+			Body:       RenderError(err),
+			StatusCode: StatusCode(err),
+		}, nil
+	}
+
+	// Create the device
+	d, err := s.store.CreateDevice(ctx, request.Body.Name, ch.UUID)
+	if err != nil {
+		return CreateDevicedefaultJSONResponse{
+			Body:       RenderError(err),
+			StatusCode: StatusCode(err),
+		}, nil
+	}
+
+	connected := false
+	resp := DeviceSummary{
+		UUID: &d.UUID,
+		Name: &d.Name,
+		Channel: &ChannelRef{
+			UUID: &d.ChannelUUID,
+			Name: &ch.Name,
+		},
+		Connected: &connected,
+	}
+
+	return CreateDevice201JSONResponse(resp), nil
+}

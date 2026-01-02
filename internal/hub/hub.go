@@ -24,6 +24,8 @@ type SessionInfo struct {
 	RemoteAddr  string
 	ChannelUUID uuid.UUID
 	ChannelName string
+	Ephemeral   bool
+	DisplayName string
 }
 
 type Hub struct {
@@ -134,9 +136,11 @@ func (h *Hub) unregister(client *Client) {
 			log.Printf("%v deregister %v\n", client, ch.Name)
 			ch.unsubscribe(client)
 			delete(h.clients, client)
-			// Record disconnect time in database
-			if err := h.store.LogoutDevice(context.Background(), client.UUID); err != nil {
-				log.Printf("%v failed to record logout: %v\n", client, err)
+			// Record disconnect time in database (skip for ephemeral clients)
+			if !client.Ephemeral {
+				if err := h.store.LogoutDevice(context.Background(), client.UUID); err != nil {
+					log.Printf("%v failed to record logout: %v\n", client, err)
+				}
 			}
 		}
 		return nil
@@ -262,6 +266,85 @@ func (h *Hub) GetWsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { h.wsHandler(w, r) }
 }
 
+// registerEphemeral registers an ephemeral client without device database operations
+func (h *Hub) registerEphemeral(client *Client, channelUUID uuid.UUID) error {
+	claimed := client.hub.CompareAndSwap(nil, h)
+	if !claimed {
+		return errors.New("Client registered to different hub")
+	}
+
+	err := RunTask(h.tasks, func() error {
+		nxt, err := h.getChannel(channelUUID)
+		if err != nil {
+			return err
+		}
+		log.Printf("%v ephemeral register %v\n", client, nxt.Name)
+		nxt.subscribe(client)
+		h.clients[client] = nxt
+		return nil
+	})
+	return err
+}
+
+// virtualDisplayHandler handles WebSocket connections for ephemeral virtual displays
+func (h *Hub) virtualDisplayHandler(w http.ResponseWriter, r *http.Request) {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	// Check for X-Forwarded-For header (set by reverse proxies)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if idx := strings.Index(xff, ","); idx != -1 {
+			host = strings.TrimSpace(xff[:idx])
+		} else {
+			host = strings.TrimSpace(xff)
+		}
+		host = strings.TrimPrefix(host, "::ffff:")
+	}
+
+	q := r.URL.Query()
+	channelID := q.Get("channel")
+
+	if len(channelID) == 0 {
+		log.Printf("%v: No channel UUID specified for virtual display", host)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	channelUUID, err := uuid.Parse(channelID)
+	if err != nil {
+		log.Printf("%v %v: Channel UUID is not valid: %v\n", channelID, host, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Verify channel exists
+	_, err = h.store.GetChannelByUUID(r.Context(), channelUUID)
+	if err != nil {
+		log.Printf("%v %v: failed to get channel: %v\n", channelUUID, host, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("%v %v: failed to establish websocket: %v\n", channelUUID, host, err)
+		return
+	}
+
+	// Generate ephemeral session UUID (not persisted)
+	sessionUUID := uuid.New()
+
+	client := NewClient(sessionUUID, conn, host)
+	client.Ephemeral = true
+	client.DisplayName = "Virtual Display"
+
+	log.Printf("%v virtual display established from %v for channel %v", client, host, channelUUID)
+	_ = h.registerEphemeral(client, channelUUID)
+}
+
+// GetVirtualDisplayHandler returns the HTTP handler for virtual display WebSocket connections
+func (h *Hub) GetVirtualDisplayHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { h.virtualDisplayHandler(w, r) }
+}
+
 func (h *Hub) GetSessions() []SessionInfo {
 	resp := []SessionInfo{}
 	_ = RunTask(h.tasks, func() error {
@@ -272,6 +355,8 @@ func (h *Hub) GetSessions() []SessionInfo {
 				RemoteAddr:  k.RealIP,
 				ChannelUUID: v.UUID,
 				ChannelName: v.Name,
+				Ephemeral:   k.Ephemeral,
+				DisplayName: k.DisplayName,
 			})
 		}
 		return nil
