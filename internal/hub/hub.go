@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -285,4 +286,116 @@ func (h *Hub) GetLastImage(channelUUID uuid.UUID) (*ClientImage, error) {
 		return nil
 	})
 	return resp, err
+}
+
+// PushToChannel pushes an image to all devices subscribed to a channel
+func (h *Hub) PushToChannel(channelUUID uuid.UUID, image []byte, duration time.Duration) error {
+	return RunTask(h.tasks, func() error {
+		ch, err := h.getChannel(channelUUID)
+		if err != nil {
+			return err
+		}
+		return ch.pushContent(image, duration)
+	})
+}
+
+// ClearChannelPush clears any active push override on a channel
+func (h *Hub) ClearChannelPush(channelUUID uuid.UUID) error {
+	return RunTask(h.tasks, func() error {
+		ch := h.channels[channelUUID]
+		if ch == nil {
+			// Channel not running, nothing to clear
+			return nil
+		}
+		return ch.clearOverride()
+	})
+}
+
+// PushToDevice pushes an image to a specific device, overriding its channel subscription
+func (h *Hub) PushToDevice(deviceUUID uuid.UUID, image []byte, duration time.Duration) error {
+	return RunTask(h.tasks, func() error {
+		// Find the client by device UUID
+		var client *Client
+		var channel *Channel
+		for c, ch := range h.clients {
+			if c.UUID == deviceUUID {
+				client = c
+				channel = ch
+				break
+			}
+		}
+		if client == nil {
+			return errors.New("device not connected")
+		}
+
+		// Set override on the client
+		if duration > 0 {
+			client.overrideUntil = time.Now().Add(duration)
+			// Schedule clearing the override and sending channel's last image
+			go func() {
+				time.Sleep(duration)
+				_ = RunTask(h.tasks, func() error {
+					// Check if override is still set to the same time (not replaced)
+					if !client.overrideUntil.IsZero() && time.Now().After(client.overrideUntil) {
+						client.overrideUntil = time.Time{}
+						// Send the channel's last image immediately
+						if channel != nil && channel.last != nil {
+							client.send <- channel.last
+						}
+					}
+					return nil
+				})
+			}()
+		} else {
+			// Indefinite override
+			client.overrideUntil = time.Now().Add(24 * 365 * time.Hour)
+		}
+
+		// Send the image
+		client.send <- &ClientImage{TTL: duration, Data: image}
+		return nil
+	})
+}
+
+// ClearDevicePush clears any active push override on a device and returns to channel content
+func (h *Hub) ClearDevicePush(deviceUUID uuid.UUID) error {
+	return RunTask(h.tasks, func() error {
+		// Find the client by device UUID
+		var client *Client
+		var channel *Channel
+		for c, ch := range h.clients {
+			if c.UUID == deviceUUID {
+				client = c
+				channel = ch
+				break
+			}
+		}
+		if client == nil {
+			return errors.New("device not connected")
+		}
+
+		// Clear the override
+		client.overrideUntil = time.Time{}
+
+		// Send the channel's last image immediately
+		if channel != nil && channel.last != nil {
+			client.send <- channel.last
+		}
+		return nil
+	})
+}
+
+// IsDeviceConnected checks if a device is currently connected
+func (h *Hub) IsDeviceConnected(deviceUUID uuid.UUID) bool {
+	connected := false
+	_ = RunTask(h.tasks, func() error {
+		for c := range h.clients {
+			if c.UUID == deviceUUID {
+				connected = true
+				break
+			}
+		}
+		return nil
+	})
+	return connected
 }

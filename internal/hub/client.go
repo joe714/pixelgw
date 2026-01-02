@@ -35,12 +35,13 @@ type ClientImage struct {
 // the ClientUUID / connection string, which is either a device ID or
 // a future extension for anonymous subscriptions directly to a channel
 type Client struct {
-	SessionID uint32
-	UUID      uuid.UUID
-	RealIP    string // The actual client IP (may differ from conn.RemoteAddr if proxied)
-	hub       atomic.Pointer[Hub]
-	conn      *websocket.Conn
-	send      chan *ClientImage
+	SessionID     uint32
+	UUID          uuid.UUID
+	RealIP        string // The actual client IP (may differ from conn.RemoteAddr if proxied)
+	hub           atomic.Pointer[Hub]
+	conn          *websocket.Conn
+	send          chan *ClientImage
+	overrideUntil time.Time // when set, ignore channel broadcasts
 }
 
 func NewClient(clientUUID uuid.UUID, conn *websocket.Conn, realIP string) *Client {

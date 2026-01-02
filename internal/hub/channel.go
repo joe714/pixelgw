@@ -27,15 +27,16 @@ type AppConfig struct {
 }
 
 type Channel struct {
-	UUID    uuid.UUID
-	Name    string
-	hub     *Hub
-	timer   *time.Timer
-	tasks   chan *task
-	clients map[*Client]bool
-	apps    []AppConfig
-	nextApp int
-	last    *ClientImage
+	UUID          uuid.UUID
+	Name          string
+	hub           *Hub
+	timer         *time.Timer
+	tasks         chan *task
+	clients       map[*Client]bool
+	apps          []AppConfig
+	nextApp       int
+	last          *ClientImage
+	overrideUntil time.Time // when set, pause render loop
 }
 
 func NewChannel(hub *Hub, uuid uuid.UUID, name string, apps []AppConfig) *Channel {
@@ -65,18 +66,40 @@ func (c *Channel) run() {
 	for {
 		select {
 		case <-c.timer.C:
+			// Check if we're in override mode
+			if !c.overrideUntil.IsZero() {
+				remaining := time.Until(c.overrideUntil)
+				if remaining > 0 {
+					// Still in override, wait until it expires
+					c.timer.Reset(remaining)
+					continue
+				}
+				// Override expired, clear it
+				c.overrideUntil = time.Time{}
+			}
+
 			buf, ttl := c.renderNext()
 			if buf != nil {
 				// TODO: redo the ttl / priority of channel images vs uploads
 				c.last = &ClientImage{TTL: ttl, Data: buf}
-				for client, _ := range c.clients {
-					client.send <- c.last
-				}
+				c.broadcastToClients(c.last)
 			}
 			c.timer.Reset(ttl)
 		case task := <-c.tasks:
 			task.run()
 		}
+	}
+}
+
+// broadcastToClients sends an image to all subscribed clients, respecting client overrides
+func (c *Channel) broadcastToClients(img *ClientImage) {
+	now := time.Now()
+	for client := range c.clients {
+		// Skip clients that have their own override active
+		if !client.overrideUntil.IsZero() && client.overrideUntil.After(now) {
+			continue
+		}
+		client.send <- img
 	}
 }
 
@@ -135,6 +158,53 @@ func expandLocationConfigs(sch *schema.Schema, config map[string]string) map[str
 	}
 
 	return locations.ExpandLocationConfigs(fields, config)
+}
+
+// pushContent sends an image to all clients and sets the channel override
+func (c *Channel) pushContent(image []byte, duration time.Duration) error {
+	return RunTask(c.tasks, func() error {
+		// Set override (duration of 0 means indefinite until next render or push)
+		if duration > 0 {
+			c.overrideUntil = time.Now().Add(duration)
+		} else {
+			// Indefinite - set to a far future time
+			c.overrideUntil = time.Now().Add(24 * 365 * time.Hour)
+		}
+
+		// Broadcast to all clients (including those with overrides since this is explicit)
+		img := &ClientImage{TTL: duration, Data: image}
+		for client := range c.clients {
+			client.send <- img
+		}
+
+		// Reset timer to check override expiry
+		if !c.timer.Stop() {
+			select {
+			case <-c.timer.C:
+			default:
+			}
+		}
+		if duration > 0 {
+			c.timer.Reset(duration)
+		}
+		return nil
+	})
+}
+
+// clearOverride clears any active push override and resumes normal render loop
+func (c *Channel) clearOverride() error {
+	return RunTask(c.tasks, func() error {
+		c.overrideUntil = time.Time{}
+		// Reset timer to fire immediately for next render
+		if !c.timer.Stop() {
+			select {
+			case <-c.timer.C:
+			default:
+			}
+		}
+		c.timer.Reset(time.Nanosecond)
+		return nil
+	})
 }
 
 func (c *Channel) subscribe(client *Client) error {

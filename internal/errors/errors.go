@@ -57,8 +57,14 @@ func Code(e error) int32 {
 	return 1000
 }
 
+// Is wraps errors.Is for convenience
+func Is(err, target error) bool {
+	return ne.Is(err, target)
+}
+
 var (
 	ChannelExists      = New(1001, "channel exists")
 	ChannelNotFound    = New(1002, "channel not found")
+	DeviceNotFound     = New(1003, "device not found")
 	AppIndexOutOfRange = New(1011, "index out of range")
 )

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -174,6 +175,18 @@ type Location struct {
 // Notification defines model for Notification.
 type Notification = SchemaField
 
+// PushAppletRequest defines model for PushAppletRequest.
+type PushAppletRequest struct {
+	// Applet Applet ID from catalog
+	Applet string `json:"applet"`
+
+	// Config Applet configuration
+	Config *map[string]interface{} `json:"config,omitempty"`
+
+	// Duration Display duration in seconds (default 15, 0 for indefinite)
+	Duration *int `json:"duration,omitempty"`
+}
+
 // Schema defines model for Schema.
 type Schema = schema.Schema
 
@@ -231,12 +244,30 @@ type PatchChannelJSONBody struct {
 	Name *string `json:"name,omitempty"`
 }
 
+// PushChannelContentMultipartBody defines parameters for PushChannelContent.
+type PushChannelContentMultipartBody struct {
+	// Duration Display duration in seconds (default 15, 0 for indefinite)
+	Duration *int `json:"duration,omitempty"`
+
+	// Image WebP image (max 128KB, must be 64x32)
+	Image openapi_types.File `json:"image"`
+}
+
 // PatchDeviceJSONBody defines parameters for PatchDevice.
 type PatchDeviceJSONBody struct {
 	Channel *ChannelRef `json:"channel,omitempty"`
 
 	// Name Device name
 	Name *string `json:"name,omitempty"`
+}
+
+// PushDeviceContentMultipartBody defines parameters for PushDeviceContent.
+type PushDeviceContentMultipartBody struct {
+	// Duration Display duration in seconds (default 15, 0 for indefinite)
+	Duration *int `json:"duration,omitempty"`
+
+	// Image WebP image (max 128KB, must be 64x32)
+	Image openapi_types.File `json:"image"`
 }
 
 // SearchLocationsParams defines parameters for SearchLocations.
@@ -260,8 +291,20 @@ type PatchChannelAppletJSONRequestBody PatchChannelAppletJSONBody
 // PatchChannelJSONRequestBody defines body for PatchChannel for application/json ContentType.
 type PatchChannelJSONRequestBody PatchChannelJSONBody
 
+// PushChannelContentJSONRequestBody defines body for PushChannelContent for application/json ContentType.
+type PushChannelContentJSONRequestBody = PushAppletRequest
+
+// PushChannelContentMultipartRequestBody defines body for PushChannelContent for multipart/form-data ContentType.
+type PushChannelContentMultipartRequestBody PushChannelContentMultipartBody
+
 // PatchDeviceJSONRequestBody defines body for PatchDevice for application/json ContentType.
 type PatchDeviceJSONRequestBody PatchDeviceJSONBody
+
+// PushDeviceContentJSONRequestBody defines body for PushDeviceContent for application/json ContentType.
+type PushDeviceContentJSONRequestBody = PushAppletRequest
+
+// PushDeviceContentMultipartRequestBody defines body for PushDeviceContent for multipart/form-data ContentType.
+type PushDeviceContentMultipartRequestBody PushDeviceContentMultipartBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -295,6 +338,12 @@ type ServerInterface interface {
 
 	// (PATCH /channels/{uuid})
 	PatchChannel(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Clear channel push override
+	// (DELETE /channels/{uuid}/push)
+	ClearChannelPush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Push temporary content to channel
+	// (POST /channels/{uuid}/push)
+	PushChannelContent(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
 	// Get configured devices
 	// (GET /devices)
 	GetDevices(w http.ResponseWriter, r *http.Request)
@@ -307,6 +356,12 @@ type ServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Clear device push override
+	// (DELETE /devices/{uuid}/push)
+	ClearDevicePush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Push temporary content to device
+	// (POST /devices/{uuid}/push)
+	PushDeviceContent(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
 	// Search locations
 	// (GET /locations)
 	SearchLocations(w http.ResponseWriter, r *http.Request, params SearchLocationsParams)
@@ -596,6 +651,58 @@ func (siw *ServerInterfaceWrapper) PatchChannel(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// ClearChannelPush operation middleware
+func (siw *ServerInterfaceWrapper) ClearChannelPush(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearChannelPush(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PushChannelContent operation middleware
+func (siw *ServerInterfaceWrapper) PushChannelContent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PushChannelContent(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // GetDevices operation middleware
 func (siw *ServerInterfaceWrapper) GetDevices(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -680,6 +787,58 @@ func (siw *ServerInterfaceWrapper) PatchDevice(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchDevice(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ClearDevicePush operation middleware
+func (siw *ServerInterfaceWrapper) ClearDevicePush(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearDevicePush(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PushDeviceContent operation middleware
+func (siw *ServerInterfaceWrapper) PushDeviceContent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PushDeviceContent(w, r, uuid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -897,10 +1056,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("PATCH "+options.BaseURL+"/channels/{channelUUID}/applets/{appletUUID}", wrapper.PatchChannelApplet)
 	m.HandleFunc("GET "+options.BaseURL+"/channels/{uuid}", wrapper.FindChannelByUUID)
 	m.HandleFunc("PATCH "+options.BaseURL+"/channels/{uuid}", wrapper.PatchChannel)
+	m.HandleFunc("DELETE "+options.BaseURL+"/channels/{uuid}/push", wrapper.ClearChannelPush)
+	m.HandleFunc("POST "+options.BaseURL+"/channels/{uuid}/push", wrapper.PushChannelContent)
 	m.HandleFunc("GET "+options.BaseURL+"/devices", wrapper.GetDevices)
 	m.HandleFunc("DELETE "+options.BaseURL+"/devices/{uuid}", wrapper.DeleteDevice)
 	m.HandleFunc("GET "+options.BaseURL+"/devices/{uuid}", wrapper.GetDeviceByUUID)
 	m.HandleFunc("PATCH "+options.BaseURL+"/devices/{uuid}", wrapper.PatchDevice)
+	m.HandleFunc("DELETE "+options.BaseURL+"/devices/{uuid}/push", wrapper.ClearDevicePush)
+	m.HandleFunc("POST "+options.BaseURL+"/devices/{uuid}/push", wrapper.PushDeviceContent)
 	m.HandleFunc("GET "+options.BaseURL+"/locations", wrapper.SearchLocations)
 	m.HandleFunc("GET "+options.BaseURL+"/locations/{placeId}", wrapper.GetLocationByPlaceID)
 	m.HandleFunc("GET "+options.BaseURL+"/sessions", wrapper.GetSessions)
@@ -1267,6 +1430,91 @@ func (response PatchChanneldefaultJSONResponse) VisitPatchChannelResponse(w http
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type ClearChannelPushRequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+}
+
+type ClearChannelPushResponseObject interface {
+	VisitClearChannelPushResponse(w http.ResponseWriter) error
+}
+
+type ClearChannelPush200Response struct {
+}
+
+func (response ClearChannelPush200Response) VisitClearChannelPushResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ClearChannelPush404JSONResponse Error
+
+func (response ClearChannelPush404JSONResponse) VisitClearChannelPushResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ClearChannelPushdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ClearChannelPushdefaultJSONResponse) VisitClearChannelPushResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type PushChannelContentRequestObject struct {
+	UUID          openapi_types.UUID `json:"uuid"`
+	JSONBody      *PushChannelContentJSONRequestBody
+	MultipartBody *multipart.Reader
+}
+
+type PushChannelContentResponseObject interface {
+	VisitPushChannelContentResponse(w http.ResponseWriter) error
+}
+
+type PushChannelContent200Response struct {
+}
+
+func (response PushChannelContent200Response) VisitPushChannelContentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type PushChannelContent400JSONResponse Error
+
+func (response PushChannelContent400JSONResponse) VisitPushChannelContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushChannelContent404JSONResponse Error
+
+func (response PushChannelContent404JSONResponse) VisitPushChannelContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushChannelContentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PushChannelContentdefaultJSONResponse) VisitPushChannelContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type GetDevicesRequestObject struct {
 }
 
@@ -1375,6 +1623,109 @@ type PatchDevicedefaultJSONResponse struct {
 }
 
 func (response PatchDevicedefaultJSONResponse) VisitPatchDeviceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type ClearDevicePushRequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+}
+
+type ClearDevicePushResponseObject interface {
+	VisitClearDevicePushResponse(w http.ResponseWriter) error
+}
+
+type ClearDevicePush200Response struct {
+}
+
+func (response ClearDevicePush200Response) VisitClearDevicePushResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ClearDevicePush404JSONResponse Error
+
+func (response ClearDevicePush404JSONResponse) VisitClearDevicePushResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ClearDevicePush409JSONResponse Error
+
+func (response ClearDevicePush409JSONResponse) VisitClearDevicePushResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ClearDevicePushdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ClearDevicePushdefaultJSONResponse) VisitClearDevicePushResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type PushDeviceContentRequestObject struct {
+	UUID          openapi_types.UUID `json:"uuid"`
+	JSONBody      *PushDeviceContentJSONRequestBody
+	MultipartBody *multipart.Reader
+}
+
+type PushDeviceContentResponseObject interface {
+	VisitPushDeviceContentResponse(w http.ResponseWriter) error
+}
+
+type PushDeviceContent200Response struct {
+}
+
+func (response PushDeviceContent200Response) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type PushDeviceContent400JSONResponse Error
+
+func (response PushDeviceContent400JSONResponse) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushDeviceContent404JSONResponse Error
+
+func (response PushDeviceContent404JSONResponse) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushDeviceContent409JSONResponse Error
+
+func (response PushDeviceContent409JSONResponse) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushDeviceContentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PushDeviceContentdefaultJSONResponse) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -1508,6 +1859,12 @@ type StrictServerInterface interface {
 
 	// (PATCH /channels/{uuid})
 	PatchChannel(ctx context.Context, request PatchChannelRequestObject) (PatchChannelResponseObject, error)
+	// Clear channel push override
+	// (DELETE /channels/{uuid}/push)
+	ClearChannelPush(ctx context.Context, request ClearChannelPushRequestObject) (ClearChannelPushResponseObject, error)
+	// Push temporary content to channel
+	// (POST /channels/{uuid}/push)
+	PushChannelContent(ctx context.Context, request PushChannelContentRequestObject) (PushChannelContentResponseObject, error)
 	// Get configured devices
 	// (GET /devices)
 	GetDevices(ctx context.Context, request GetDevicesRequestObject) (GetDevicesResponseObject, error)
@@ -1520,6 +1877,12 @@ type StrictServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(ctx context.Context, request PatchDeviceRequestObject) (PatchDeviceResponseObject, error)
+	// Clear device push override
+	// (DELETE /devices/{uuid}/push)
+	ClearDevicePush(ctx context.Context, request ClearDevicePushRequestObject) (ClearDevicePushResponseObject, error)
+	// Push temporary content to device
+	// (POST /devices/{uuid}/push)
+	PushDeviceContent(ctx context.Context, request PushDeviceContentRequestObject) (PushDeviceContentResponseObject, error)
 	// Search locations
 	// (GET /locations)
 	SearchLocations(ctx context.Context, request SearchLocationsRequestObject) (SearchLocationsResponseObject, error)
@@ -1847,6 +2210,75 @@ func (sh *strictHandler) PatchChannel(w http.ResponseWriter, r *http.Request, uu
 	}
 }
 
+// ClearChannelPush operation middleware
+func (sh *strictHandler) ClearChannelPush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request ClearChannelPushRequestObject
+
+	request.UUID = uuid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClearChannelPush(ctx, request.(ClearChannelPushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClearChannelPush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClearChannelPushResponseObject); ok {
+		if err := validResponse.VisitClearChannelPushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PushChannelContent operation middleware
+func (sh *strictHandler) PushChannelContent(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request PushChannelContentRequestObject
+
+	request.UUID = uuid
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body PushChannelContentJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PushChannelContent(ctx, request.(PushChannelContentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PushChannelContent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PushChannelContentResponseObject); ok {
+		if err := validResponse.VisitPushChannelContentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDevices operation middleware
 func (sh *strictHandler) GetDevices(w http.ResponseWriter, r *http.Request) {
 	var request GetDevicesRequestObject
@@ -1956,6 +2388,75 @@ func (sh *strictHandler) PatchDevice(w http.ResponseWriter, r *http.Request, uui
 	}
 }
 
+// ClearDevicePush operation middleware
+func (sh *strictHandler) ClearDevicePush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request ClearDevicePushRequestObject
+
+	request.UUID = uuid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClearDevicePush(ctx, request.(ClearDevicePushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClearDevicePush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClearDevicePushResponseObject); ok {
+		if err := validResponse.VisitClearDevicePushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PushDeviceContent operation middleware
+func (sh *strictHandler) PushDeviceContent(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request PushDeviceContentRequestObject
+
+	request.UUID = uuid
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body PushDeviceContentJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PushDeviceContent(ctx, request.(PushDeviceContentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PushDeviceContent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PushDeviceContentResponseObject); ok {
+		if err := validResponse.VisitPushDeviceContentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SearchLocations operation middleware
 func (sh *strictHandler) SearchLocations(w http.ResponseWriter, r *http.Request, params SearchLocationsParams) {
 	var request SearchLocationsRequestObject
@@ -2035,46 +2536,55 @@ func (sh *strictHandler) GetSessions(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"/4vF8V67SwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

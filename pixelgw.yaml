@@ -236,6 +236,81 @@ paths:
           description: Channel updated successfully
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+  /channels/{uuid}/push:
+    post:
+      summary: Push temporary content to channel
+      description: Push a WebP image or render an applet and display it temporarily on all devices subscribed to this channel
+      operationId: pushChannelContent
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the channel
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: WebP image (max 128KB, must be 64x32)
+                duration:
+                  type: integer
+                  description: Display duration in seconds (default 15, 0 for indefinite)
+                  default: 15
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushAppletRequest'
+      responses:
+        '200':
+          description: Content pushed successfully
+        '400':
+          description: Bad request (invalid image format, size, dimensions, or applet)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    delete:
+      summary: Clear channel push override
+      description: Clear any active push override on a channel and resume normal render loop immediately
+      operationId: clearChannelPush
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the channel
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Override cleared (or no override was active)
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /channels/{channelUUID}/applets:
     post:
       description: Create a new applet instance
@@ -420,6 +495,93 @@ paths:
       responses:
         '200':
           description: Device deleted successfully
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /devices/{uuid}/push:
+    post:
+      summary: Push temporary content to device
+      description: Push a WebP image or render an applet and display it temporarily on a specific device, overriding its channel subscription
+      operationId: pushDeviceContent
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the device
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: WebP image (max 128KB, must be 64x32)
+                duration:
+                  type: integer
+                  description: Display duration in seconds (default 15, 0 for indefinite)
+                  default: 15
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushAppletRequest'
+      responses:
+        '200':
+          description: Content pushed successfully
+        '400':
+          description: Bad request (invalid image format, size, dimensions, or applet)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Device not currently connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    delete:
+      summary: Clear device push override
+      description: Clear any active push override on a device and return to channel content immediately
+      operationId: clearDevicePush
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the device
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Override cleared (or no override was active)
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Device not currently connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
   /sessions:
@@ -714,6 +876,22 @@ components:
         path: tidbyt.dev/pixlet/schema
       allOf:
        - $ref: '#/components/schemas/SchemaField'
+    PushAppletRequest:
+      type: object
+      required:
+        - applet
+      properties:
+        applet:
+          type: string
+          description: Applet ID from catalog
+        config:
+          type: object
+          additionalProperties: true
+          description: Applet configuration
+        duration:
+          type: integer
+          description: Display duration in seconds (default 15, 0 for indefinite)
+          default: 15
     Error:
       type: object
       required:

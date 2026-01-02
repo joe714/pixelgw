@@ -20,7 +20,7 @@ _COMPOSE_FILE ?= ${_COMPOSE_DIR}/compose.yaml
 _COMPOSE_ENV_FILE ?= ${_COMPOSE_DIR}/env
 _COMPOSE_TAG ?= ${GIT_HASH}
 
-.PHONY: build generate deploy web_install web_generate web pixelclient
+.PHONY: build generate deploy web_install web_generate web pixelclient test
 
 pixelclient:
 	go build -o bin/pixelclient ./cmd/pixelclient
@@ -43,6 +43,10 @@ web: web_generate
 generate: stage1
 	docker run --rm ${DOCKER_USERFLAG} -v ${BUILDROOT}:/go/src ${_STAGE1_IMAGE} \
 	       	make -f build/Makefile generate
+
+test: stage1
+	docker run --rm ${DOCKER_USERFLAG} -v ${BUILDROOT}:/go/src ${_STAGE1_IMAGE} \
+		go test ./...
 
 tag: build
 	$(MAKE) _tag
