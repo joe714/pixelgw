@@ -20,6 +20,68 @@ Example device firmware is coming soon.
 Currently the server is intended for single tenant use on a secured
 home network, and there is no user validation for the REST APIs.
 
+# PixelClient
+
+PixelClient is a terminal UI client included with PixelGW that simulates an LED matrix
+display in your terminal. It connects to the server via WebSocket and renders received
+WebP frames as colored ASCII art.
+
+## Building
+
+    $ go build -o bin/ cmd/pixelclient/main.go
+
+Or it will be built automatically as part of `make build`.
+
+## Usage
+
+```
+pixelclient [flags]
+
+Flags:
+  -c, --config <path>      Path to config file (default: ~/.pixelclient/config.json)
+  -d, --device <name>      Use named device from config (bypass menu)
+  -n, --new                Create new device (interactive if missing args)
+      --server <ip:port>   Server address (used with --new)
+      --device-id <uuid>   Custom device UUID (optional, used with --new)
+      --headless           Run without TUI, print frame info to stdout
+      --time <seconds>     Auto-disconnect after N seconds (with --headless)
+```
+
+## Examples
+
+```bash
+# First run - create a new device interactively
+pixelclient --new
+# Prompts for: Device name, Server (ip:port)
+
+# Create a device with all parameters
+pixelclient --new -d living-room --server 192.168.1.100:8080
+
+# Connect using a saved device
+pixelclient -d living-room
+
+# Run without arguments to auto-select "default" device or show menu
+pixelclient
+
+# Headless mode for testing (prints frame info without TUI)
+pixelclient --headless -d living-room
+
+# Headless with auto-disconnect after 30 seconds
+pixelclient --headless --time 30 -d living-room
+```
+
+## Configuration
+
+Device configurations are stored in `~/.pixelclient/config.json`. Each device
+entry contains a name, server address, and UUID. The client will auto-select
+a device named "default" if one exists, otherwise it shows a selection menu.
+
+## TUI Controls
+
+- **q** or **Ctrl+C**: Quit
+- **↑/↓**: Navigate device list (when in menu)
+- **Enter**: Select device
+
 # Compile and deploy
 PixelGW is primarily built and run as a docker image.
 You will need Docker installed and configured with your user in the docker group.
