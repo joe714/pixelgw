@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -117,88 +116,90 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Configure Device</DialogTitle>
-          <DialogDescription>
-            Update the device name and channel subscription.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="device-id" className="text-right">
-              Device ID
-            </Label>
-            <div className="col-span-3 relative">
-              <Input
-                id="device-id"
-                value={device.uuid || ''}
-                className="pr-10"
-                disabled
-              />
-              <div
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
-                title="Copy"
-                onClick={() => {
-                  if (device.uuid) {
-                    navigator.clipboard.writeText(device.uuid)
-                  }
-                }}
-              >
-                <Copy className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Configure Device</DialogTitle>
+            <DialogDescription>
+              Update the device name and channel subscription.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="device-id" className="text-right">
+                Device ID
+              </Label>
+              <div className="col-span-3 relative">
+                <Input
+                  id="device-id"
+                  value={device.uuid || ''}
+                  className="pr-10"
+                  disabled
+                />
+                <div
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
+                  title="Copy"
+                  onClick={() => {
+                    if (device.uuid) {
+                      navigator.clipboard.writeText(device.uuid)
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+                </div>
               </div>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter device name"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="channel" className="text-right">
+                Channel
+              </Label>
+              <Select value={selectedChannelUuid} onValueChange={setSelectedChannelUuid}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {channels.map((channel) => (
+                    <SelectItem key={channel.uuid} value={channel.uuid || ''}>
+                      {channel.name || channel.uuid}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-              placeholder="Enter device name"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="channel" className="text-right">
-              Channel
-            </Label>
-            <Select value={selectedChannelUuid} onValueChange={setSelectedChannelUuid}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a channel" />
-              </SelectTrigger>
-              <SelectContent>
-                {channels.map((channel) => (
-                  <SelectItem key={channel.uuid} value={channel.uuid || ''}>
-                    {channel.name || channel.uuid}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter className="sm:justify-between">
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="mr-auto"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Device
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="mr-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Device
             </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? 'Saving...' : 'Save changes'}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={loading}>
+                {loading ? 'Saving...' : 'Save changes'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
@@ -210,16 +211,16 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            <Button
+              variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </>
   )
 }
