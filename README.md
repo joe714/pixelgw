@@ -100,8 +100,12 @@ To build the docker image:
 
 There are two default deploy targets:
 - *make deploy_prod* will deploy the single complete production image on port 8080.
-- *make deploy_test* will deploy the server image as well as live node image running
-  the web UI from the source tree with HMR enabled on port 8081.
+- *make deploy_test* will deploy two containers:
+  - The Go server on port 8081 (devices and API connect here)
+  - Vite dev server on port 8082 (web UI with HMR for development)
+
+  Note: The Vite WebSocket proxy has issues with binary frames, so devices must
+  connect directly to port 8081 rather than through the Vite proxy.
 
 # Applets
 Applets are built into the docker image from the contents of the /apps directories:
