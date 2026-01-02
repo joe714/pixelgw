@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-import { Plus, Settings } from 'lucide-react'
+import { Plus, Settings, ExternalLink } from 'lucide-react'
 
 import { restClient } from '@/rest-client'
 import type { components } from '@/openapi'
@@ -156,7 +156,18 @@ export function ChannelList() {
                       {channel.comment || 'No description'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                  <div className="flex items-center gap-1 ml-4 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        window.open(`/display/channel/${channel.uuid}`, '_blank')
+                      }}
+                      title="Open as virtual display"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="sr-only">Open {channel.name} as virtual display</span>
+                    </Button>
                     <Link to={`/channels/${channel.uuid}`}>
                       <Button variant="ghost" size="sm">
                         <Settings className="h-4 w-4" />
