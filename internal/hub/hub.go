@@ -311,19 +311,20 @@ func (h *Hub) ClearChannelPush(channelUUID uuid.UUID) error {
 	})
 }
 
+// findClientByDevice looks up a client by device UUID (must be called within RunTask)
+func (h *Hub) findClientByDevice(deviceUUID uuid.UUID) (*Client, *Channel) {
+	for c, ch := range h.clients {
+		if c.UUID == deviceUUID {
+			return c, ch
+		}
+	}
+	return nil, nil
+}
+
 // PushToDevice pushes an image to a specific device, overriding its channel subscription
 func (h *Hub) PushToDevice(deviceUUID uuid.UUID, image []byte, duration time.Duration) error {
 	return RunTask(h.tasks, func() error {
-		// Find the client by device UUID
-		var client *Client
-		var channel *Channel
-		for c, ch := range h.clients {
-			if c.UUID == deviceUUID {
-				client = c
-				channel = ch
-				break
-			}
-		}
+		client, _ := h.findClientByDevice(deviceUUID)
 		if client == nil {
 			return errors.New("device not connected")
 		}
@@ -335,7 +336,13 @@ func (h *Hub) PushToDevice(deviceUUID uuid.UUID, image []byte, duration time.Dur
 			go func() {
 				time.Sleep(duration)
 				_ = RunTask(h.tasks, func() error {
-					// Check if override is still set to the same time (not replaced)
+					// Re-lookup client - it may have disconnected during sleep
+					client, channel := h.findClientByDevice(deviceUUID)
+					if client == nil {
+						// Client disconnected, nothing to do
+						return nil
+					}
+					// Check if override is still set and expired (not replaced by new push)
 					if !client.overrideUntil.IsZero() && time.Now().After(client.overrideUntil) {
 						client.overrideUntil = time.Time{}
 						// Send the channel's last image immediately
@@ -360,16 +367,7 @@ func (h *Hub) PushToDevice(deviceUUID uuid.UUID, image []byte, duration time.Dur
 // ClearDevicePush clears any active push override on a device and returns to channel content
 func (h *Hub) ClearDevicePush(deviceUUID uuid.UUID) error {
 	return RunTask(h.tasks, func() error {
-		// Find the client by device UUID
-		var client *Client
-		var channel *Channel
-		for c, ch := range h.clients {
-			if c.UUID == deviceUUID {
-				client = c
-				channel = ch
-				break
-			}
-		}
+		client, channel := h.findClientByDevice(deviceUUID)
 		if client == nil {
 			return errors.New("device not connected")
 		}
@@ -389,12 +387,8 @@ func (h *Hub) ClearDevicePush(deviceUUID uuid.UUID) error {
 func (h *Hub) IsDeviceConnected(deviceUUID uuid.UUID) bool {
 	connected := false
 	_ = RunTask(h.tasks, func() error {
-		for c := range h.clients {
-			if c.UUID == deviceUUID {
-				connected = true
-				break
-			}
-		}
+		client, _ := h.findClientByDevice(deviceUUID)
+		connected = client != nil
 		return nil
 	})
 	return connected
