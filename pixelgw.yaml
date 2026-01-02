@@ -205,6 +205,37 @@ paths:
                 format: binary
         default:
           $ref: '#/components/responses/DefaultErrorResponse'
+    patch:
+      description: Update a channel
+      operationId: patchChannel
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the channel to update
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        description: Channel attributes to update
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Channel name
+                comment:
+                  type: string
+                  description: Channel description
+      responses:
+        '200':
+          description: Channel updated successfully
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
   /channels/{channelUUID}/applets:
     post:
       description: Create a new applet instance

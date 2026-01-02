@@ -134,6 +134,46 @@ func (store *Store) GetChannelByName(ctx context.Context, name string) (*Channel
 	return &ch, err
 }
 
+func (store *Store) ModifyChannel(ctx context.Context, uuid uuid.UUID, name *string, comment *string) error {
+	return store.Update(ctx, func(tx *TX) error {
+		// Verify channel exists
+		ch := Channel{}
+		stmt := sqlair.MustPrepare(
+			`SELECT &Channel.* FROM channels WHERE uuid = $M.uuid`,
+			Channel{},
+			sqlair.M{})
+		err := tx.Query(stmt, sqlair.M{"uuid": uuid}).Get(&ch)
+		if err != nil {
+			if ne.Is(err, sqlair.ErrNoRows) {
+				return errors.ChannelNotFound
+			}
+			return err
+		}
+
+		if name != nil {
+			stmt = sqlair.MustPrepare(
+				`UPDATE channels SET name = $M.name WHERE uuid = $M.uuid`,
+				sqlair.M{})
+			err = tx.Query(stmt, sqlair.M{"uuid": uuid, "name": *name}).Run()
+			if err != nil {
+				return err
+			}
+		}
+
+		if comment != nil {
+			stmt = sqlair.MustPrepare(
+				`UPDATE channels SET comment = $M.comment WHERE uuid = $M.uuid`,
+				sqlair.M{})
+			err = tx.Query(stmt, sqlair.M{"uuid": uuid, "comment": *comment}).Run()
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (store *Store) CreateChannelApplet(ctx context.Context, channelUUID uuid.UUID, app *ChannelApplet) error {
 	if uuid.Nil == app.UUID {
 		uuid, err := uuid.NewV7()

@@ -1,12 +1,9 @@
 import { makeLoader, useLoaderData } from "react-router-typesafe"
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 
-import { SquarePlus, Settings, ChevronRight } from 'lucide-react'
+import { SquarePlus, Settings } from 'lucide-react'
 
 import { restClient } from '@/rest-client'
 import type { components } from '@/openapi'
@@ -35,53 +32,8 @@ export const channelListLoader = makeLoader(
   }
 );
 
-interface ChannelConfigModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  channel: ChannelDetail | null
-}
-
-function ChannelConfigModal({ open, onOpenChange, channel }: ChannelConfigModalProps) {
-  const [name, setName] = useState(channel?.name || '')
-  const [comment, setComment] = useState(channel?.comment || '')
-  
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Configure Channel</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="channel-name" className="text-right">Name</Label>
-            <Input
-              id="channel-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="channel-comment" className="text-right">Description</Label>
-            <Input
-              id="channel-comment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 export function ChannelList() {
   const data = useLoaderData<typeof channelListLoader>();
-  const [configModal, setConfigModal] = useState<{ open: boolean; channel: ChannelDetail | null }>({ 
-    open: false, 
-    channel: null 
-  })
 
   const renderDeviceList = (items: ChannelDetail['subscribers'], maxDisplay: number = 5) => {
     if (!items || items.length === 0) {
@@ -157,21 +109,10 @@ export function ChannelList() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setConfigModal({ open: true, channel })
-                      }}
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span className="sr-only">Configure {channel.name}</span>
-                    </Button>
                     <Link to={`/channels/${channel.uuid}`}>
-                      <Button variant="outline" size="sm">
-                        Manage
-                        <ChevronRight className="h-4 w-4 ml-1" />
+                      <Button variant="ghost" size="sm">
+                        <Settings className="h-4 w-4" />
+                        <span className="sr-only">Manage {channel.name}</span>
                       </Button>
                     </Link>
                   </div>
@@ -192,12 +133,6 @@ export function ChannelList() {
           </div>
         ))}
       </div>
-
-      <ChannelConfigModal
-        open={configModal.open}
-        onOpenChange={(open) => setConfigModal({ open, channel: configModal.channel })}
-        channel={configModal.channel}
-      />
     </div>
   )
 }

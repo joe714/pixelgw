@@ -113,6 +113,18 @@ func (s *Server) FindChannelByUUID(ctx context.Context, request FindChannelByUUI
 	return FindChannelByUUID200JSONResponse(cd), nil
 }
 
+func (s *Server) PatchChannel(ctx context.Context, request PatchChannelRequestObject) (PatchChannelResponseObject, error) {
+	err := s.store.ModifyChannel(ctx, request.UUID, request.Body.Name, request.Body.Comment)
+	if err != nil {
+		return PatchChanneldefaultJSONResponse{
+				Body:       RenderError(err),
+				StatusCode: StatusCode(err),
+			},
+			nil
+	}
+	return PatchChannel200Response{}, nil
+}
+
 func (s *Server) CreateChannelApplet(ctx context.Context, request CreateChannelAppletRequestObject) (CreateChannelAppletResponseObject, error) {
 	app := durable.ChannelApplet{
 		Idx:   -1,
