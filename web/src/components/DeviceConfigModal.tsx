@@ -75,7 +75,7 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
     
     setLoading(true)
     try {
-      const patchData: any = {}
+      const patchData: { name?: string; channel?: { uuid: string } } = {}
       
       if (name !== device.name) {
         patchData.name = name

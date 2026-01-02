@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Monitor, Wifi, WifiOff, Settings } from 'lucide-react'
 import { restClient } from '@/rest-client'
 import { DeviceConfigModal } from '@/components/DeviceConfigModal'
+import type { components } from '@/openapi'
+
+type DeviceSummary = components['schemas']['DeviceSummary']
 
 export const devicesLoader = makeLoader(
   async () => await restClient.GET("/devices")
@@ -26,7 +29,7 @@ function formatLastSeen(timestamp: string | undefined): string {
 
 export function DevicesList() {
   const { data } = useLoaderData<typeof devicesLoader>();
-  const [selectedDevice, setSelectedDevice] = useState<any>(null)
+  const [selectedDevice, setSelectedDevice] = useState<DeviceSummary | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
   return (
