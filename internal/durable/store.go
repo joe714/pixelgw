@@ -78,6 +78,14 @@ func NewStore() (*Store, error) {
 		log.Printf("Migrated to schema version: %v\n", v.Version)
 	}
 
+	if v.Version < 3 {
+		v, err = store.migrateToV3()
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("Migrated to schema version: %v\n", v.Version)
+	}
+
 	return &store, nil
 }
 
@@ -127,7 +135,9 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 			channel_uuid TEXT NOT NULL COLLATE NOCASE,
 			last_ip TEXT,
 			last_connect_time TEXT,
-			last_disconnect_time TEXT
+			last_disconnect_time TEXT,
+			device_info TEXT,
+			device_info_updated TEXT
 			)`,
 		`CREATE INDEX idx_channel_devices ON devices (channel_uuid, uuid)`,
 		`INSERT INTO channels VALUES ('76ffcb18-d3c7-40d5-abea-3fe86d02a4ba', 'default', 'The default channel')`,
@@ -141,7 +151,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
                                              1,
                                              'dvd-logo',
                                              NULL)`,
-		`INSERT INTO schema_version VALUES(2);`,
+		`INSERT INTO schema_version VALUES(3);`,
 	}
 	log.Println("Perform initial database setup")
 
@@ -159,7 +169,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 		return nil
 	})
 
-	return SchemaVersion{Version: 2}, err
+	return SchemaVersion{Version: 3}, err
 }
 
 func (store *Store) migrateToV2() (SchemaVersion, error) {
@@ -185,4 +195,28 @@ func (store *Store) migrateToV2() (SchemaVersion, error) {
 	})
 
 	return SchemaVersion{Version: 2}, err
+}
+
+func (store *Store) migrateToV3() (SchemaVersion, error) {
+	stmts := []string{
+		`ALTER TABLE devices ADD COLUMN device_info TEXT`,
+		`ALTER TABLE devices ADD COLUMN device_info_updated TEXT`,
+		`INSERT INTO schema_version VALUES(3);`,
+	}
+	log.Println("Migrating database to version 3")
+
+	err := store.Update(context.Background(), func(tx *TX) error {
+		for _, s := range stmts {
+			log.Println(s)
+			stmt := sqlair.MustPrepare(s)
+			err := tx.Query(stmt).Run()
+			if err != nil {
+				log.Printf("Migration error: %v", err)
+				return err
+			}
+		}
+		return nil
+	})
+
+	return SchemaVersion{Version: 3}, err
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -19,6 +20,17 @@ func parseTime(s *string) *time.Time {
 	return &t
 }
 
+func parseDeviceInfo(s *string) *map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+	var info map[string]interface{}
+	if err := json.Unmarshal([]byte(*s), &info); err != nil {
+		return nil
+	}
+	return &info
+}
+
 func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject) (GetDevicesResponseObject, error) {
 	devs, err := s.store.GetAllDevices(ctx)
 	if err != nil {
@@ -28,6 +40,10 @@ func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject
 			},
 			nil
 	}
+
+	// Parse fields parameter
+	fields := ParseFields(request.Params.Fields)
+	includeDeviceInfo := ShouldInclude(fields, "device-info", false)
 
 	// Build a map of currently connected devices from live sessions
 	connectedDevices := make(map[string]string) // device UUID -> current IP
@@ -49,6 +65,12 @@ func (s *Server) GetDevices(ctx context.Context, request GetDevicesRequestObject
 			LastIP:             d.LastIP,
 			LastConnectTime:    parseTime(d.LastConnectTime),
 			LastDisconnectTime: parseTime(d.LastDisconnectTime),
+		}
+
+		// Include device-info if requested
+		if includeDeviceInfo {
+			ds.DeviceInfo = parseDeviceInfo(d.DeviceInfo)
+			ds.DeviceInfoUpdated = parseTime(d.DeviceInfoUpdated)
 		}
 
 		// Check if device is currently connected
@@ -76,6 +98,10 @@ func (s *Server) GetDeviceByUUID(ctx context.Context, request GetDeviceByUUIDReq
 			nil
 	}
 
+	// Parse fields parameter
+	fields := ParseFields(request.Params.Fields)
+	includeDeviceInfo := ShouldInclude(fields, "device-info", false)
+
 	// Check if device is currently connected
 	var currentIP *string
 	connected := false
@@ -102,6 +128,13 @@ func (s *Server) GetDeviceByUUID(ctx context.Context, request GetDeviceByUUIDReq
 		LastConnectTime:    parseTime(d.LastConnectTime),
 		LastDisconnectTime: parseTime(d.LastDisconnectTime),
 	}
+
+	// Include device-info if requested
+	if includeDeviceInfo {
+		resp.DeviceInfo = parseDeviceInfo(d.DeviceInfo)
+		resp.DeviceInfoUpdated = parseTime(d.DeviceInfoUpdated)
+	}
+
 	return GetDeviceByUUID200JSONResponse(resp), nil
 }
 

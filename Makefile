@@ -5,6 +5,7 @@ DOCKER_USERFLAG = -u ${DOCKER_UGID}
 DOCKER_NODE_IMAGE = node:22-alpine
 APP_NAME = pixelgw
 GIT_HASH ?= $(shell git log --format="%h" -n 1)
+GIT_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 DOCKER_RUN_NODE = run --rm ${DOCKER_USERFLAG} -v ${BUILDROOT}:/home/node -w /home/node/web ${DOCKER_NODE_IMAGE}
 
@@ -20,10 +21,13 @@ _COMPOSE_FILE ?= ${_COMPOSE_DIR}/compose.yaml
 _COMPOSE_ENV_FILE ?= ${_COMPOSE_DIR}/env
 _COMPOSE_TAG ?= ${GIT_HASH}
 
+VERSION_PKG = github.com/joe714/pixelgw/internal/version
+LDFLAGS = -ldflags "-X ${VERSION_PKG}.Version=${GIT_VERSION} -X ${VERSION_PKG}.GitCommit=${GIT_HASH}"
+
 .PHONY: build generate deploy web_install web_generate web pixelclient test
 
 pixelclient:
-	go build -o bin/pixelclient ./cmd/pixelclient
+	go build ${LDFLAGS} -o bin/pixelclient ./cmd/pixelclient
 
 build: web
 	docker build -f build/package/Dockerfile --tag ${DOCKER_USERNAME}/${APP_NAME}:${_BUILD_ARGS_TAG} .

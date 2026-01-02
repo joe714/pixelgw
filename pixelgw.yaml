@@ -440,6 +440,12 @@ paths:
     get:
       summary: Get configured devices
       operationId: getDevices
+      parameters:
+        - name: fields
+          in: query
+          description: Comma-separated list of fields to include, or * for all fields. Default excludes device-info.
+          schema:
+            type: string
       responses:
         '200':
           description: Device response
@@ -464,6 +470,11 @@ paths:
             type: string
             format: uuid
           x-go-name: UUID
+        - name: fields
+          in: query
+          description: Comma-separated list of fields to include, or * for all fields. Default excludes device-info.
+          schema:
+            type: string
       responses:
         '200':
           description: Device response
@@ -785,6 +796,16 @@ components:
               format: date-time
               description: Last disconnection timestamp
               x-go-name: LastDisconnectTime
+            device-info:
+              type: object
+              additionalProperties: true
+              description: Device information payload (firmware version, etc.)
+              x-go-name: DeviceInfo
+            device-info-updated:
+              type: string
+              format: date-time
+              description: When device info was last updated
+              x-go-name: DeviceInfoUpdated
     SessionSummary:
       type: object
       properties:

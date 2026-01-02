@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRevalidator } from 'react-router-dom'
-import { Copy, Trash2, Eye } from 'lucide-react'
+import { Copy, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -54,19 +54,38 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [identifying, setIdentifying] = useState(false)
+  const [deviceInfo, setDeviceInfo] = useState<Record<string, unknown> | null>(null)
+  const [deviceInfoUpdated, setDeviceInfoUpdated] = useState<string | null>(null)
+  const [showDeviceInfo, setShowDeviceInfo] = useState(false)
   const revalidator = useRevalidator()
 
   useEffect(() => {
-    async function fetchChannels() {
-      const response = await restClient.GET('/channels')
-      if (response.data) {
-        setChannels(response.data)
+    async function fetchData() {
+      // Fetch channels
+      const channelsResponse = await restClient.GET('/channels')
+      if (channelsResponse.data) {
+        setChannels(channelsResponse.data)
+      }
+
+      // Fetch device with device-info
+      if (device.uuid) {
+        const deviceResponse = await restClient.GET('/devices/{uuid}', {
+          params: {
+            path: { uuid: device.uuid },
+            query: { fields: '*' }
+          }
+        })
+        if (deviceResponse.data) {
+          setDeviceInfo(deviceResponse.data['device-info'] as Record<string, unknown> | null)
+          setDeviceInfoUpdated(deviceResponse.data['device-info-updated'] ?? null)
+        }
       }
     }
     if (open) {
-      fetchChannels()
+      fetchData()
       setName(device.name || '')
       setSelectedChannelUuid(device.channel?.uuid || '')
+      setShowDeviceInfo(false)
     }
   }, [open, device])
 
@@ -214,6 +233,41 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Device Info Section */}
+            {deviceInfo && Object.keys(deviceInfo).length > 0 && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="flex items-center text-sm font-medium text-slate-400 hover:text-slate-300"
+                  onClick={() => setShowDeviceInfo(!showDeviceInfo)}
+                >
+                  {showDeviceInfo ? (
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                  )}
+                  Device Info
+                  {deviceInfoUpdated && (
+                    <span className="ml-2 text-xs text-slate-500">
+                      (updated {new Date(deviceInfoUpdated).toLocaleDateString()})
+                    </span>
+                  )}
+                </button>
+                {showDeviceInfo && (
+                  <div className="mt-2 text-sm space-y-1 pl-5">
+                    {Object.entries(deviceInfo).map(([key, value]) => (
+                      typeof value !== 'object' && (
+                        <div key={key} className="flex">
+                          <span className="text-slate-500 w-24 flex-shrink-0">{key}:</span>
+                          <span className="text-slate-300">{String(value)}</span>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter className="sm:justify-between">
             <div className="flex gap-2">

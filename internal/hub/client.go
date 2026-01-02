@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -12,10 +13,11 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 64 * 1024
+	writeWait         = 10 * time.Second
+	pongWait          = 60 * time.Second
+	pingPeriod        = (pongWait * 9) / 10
+	maxMessageSize    = 64 * 1024
+	maxDeviceInfoSize = 1024 // Max size for device info payload (1KB)
 )
 
 var upgrader = websocket.Upgrader{
@@ -41,7 +43,8 @@ type Client struct {
 	hub           atomic.Pointer[Hub]
 	conn          *websocket.Conn
 	send          chan *ClientImage
-	overrideUntil time.Time // when set, ignore channel broadcasts
+	overrideUntil time.Time                     // when set, ignore channel broadcasts
+	OnDeviceInfo  func(uuid.UUID, string) error // callback for device info messages
 }
 
 func NewClient(clientUUID uuid.UUID, conn *websocket.Conn, realIP string) *Client {
@@ -93,7 +96,7 @@ func (c *Client) readPump() {
 	})
 
 	for {
-		_, _, err := c.conn.ReadMessage()
+		messageType, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("Client %v read error: %v\n", c, err)
@@ -101,6 +104,37 @@ func (c *Client) readPump() {
 				log.Printf("Client %v disconnected\n", c)
 			}
 			break
+		}
+
+		// Process text messages as potential device info
+		if messageType == websocket.TextMessage {
+			c.handleDeviceInfo(message)
+		}
+	}
+}
+
+func (c *Client) handleDeviceInfo(message []byte) {
+	if len(message) > maxDeviceInfoSize {
+		log.Printf("%v device info too large (%d bytes), dropping", c, len(message))
+		return
+	}
+
+	var info map[string]interface{}
+	if err := json.Unmarshal(message, &info); err != nil {
+		log.Printf("%v device info invalid JSON: %v", c, err)
+		return
+	}
+
+	if _, hasDevice := info["device"]; !hasDevice {
+		log.Printf("%v device info missing 'device' field, ignoring", c)
+		return
+	}
+
+	if c.OnDeviceInfo != nil {
+		if err := c.OnDeviceInfo(c.UUID, string(message)); err != nil {
+			log.Printf("%v failed to store device info: %v", c, err)
+		} else {
+			log.Printf("%v device info updated", c)
 		}
 	}
 }

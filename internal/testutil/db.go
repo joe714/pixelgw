@@ -62,10 +62,12 @@ func (t *TestDB) initSchema() error {
 			channel_uuid TEXT NOT NULL COLLATE NOCASE,
 			last_ip TEXT,
 			last_connect_time TEXT,
-			last_disconnect_time TEXT
+			last_disconnect_time TEXT,
+			device_info TEXT,
+			device_info_updated TEXT
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_channel_devices ON devices (channel_uuid)`,
-		`INSERT INTO schema_version VALUES(2)`,
+		`INSERT INTO schema_version VALUES(3)`,
 	}
 
 	for _, stmt := range stmts {

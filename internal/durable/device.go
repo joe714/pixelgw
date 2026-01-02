@@ -18,14 +18,16 @@ type Device struct {
 	LastIP             *string   `db:"last_ip"`
 	LastConnectTime    *string   `db:"last_connect_time"`
 	LastDisconnectTime *string   `db:"last_disconnect_time"`
+	DeviceInfo         *string   `db:"device_info"`
+	DeviceInfoUpdated  *string   `db:"device_info_updated"`
 }
 
 func (store *Store) GetAllDevices(ctx context.Context) ([]Device, error) {
 	resp := []Device{}
 	err := store.View(ctx, func(tx *TX) error {
 		stmt := sqlair.MustPrepare(
-			`SELECT (d.uuid, d.name, d.channel_uuid, c.name, d.last_ip, d.last_connect_time, d.last_disconnect_time)
-			     AS (&Device.uuid, &Device.name, &Device.channel_uuid, &Device.channel_name, &Device.last_ip, &Device.last_connect_time, &Device.last_disconnect_time)
+			`SELECT (d.uuid, d.name, d.channel_uuid, c.name, d.last_ip, d.last_connect_time, d.last_disconnect_time, d.device_info, d.device_info_updated)
+			     AS (&Device.uuid, &Device.name, &Device.channel_uuid, &Device.channel_name, &Device.last_ip, &Device.last_connect_time, &Device.last_disconnect_time, &Device.device_info, &Device.device_info_updated)
 			   FROM devices d
 		       LEFT JOIN channels c ON d.channel_uuid = c.uuid COLLATE NOCASE`,
 			Device{})
@@ -39,8 +41,8 @@ func (store *Store) GetDeviceByUUID(ctx context.Context, uuid uuid.UUID) (*Devic
 	resp := Device{}
 	err := store.View(ctx, func(tx *TX) error {
 		stmt := sqlair.MustPrepare(
-			`SELECT (d.uuid, d.name, d.channel_uuid, c.name, d.last_ip, d.last_connect_time, d.last_disconnect_time)
-			     AS (&Device.uuid, &Device.name, &Device.channel_uuid, &Device.channel_name, &Device.last_ip, &Device.last_connect_time, &Device.last_disconnect_time)
+			`SELECT (d.uuid, d.name, d.channel_uuid, c.name, d.last_ip, d.last_connect_time, d.last_disconnect_time, d.device_info, d.device_info_updated)
+			     AS (&Device.uuid, &Device.name, &Device.channel_uuid, &Device.channel_name, &Device.last_ip, &Device.last_connect_time, &Device.last_disconnect_time, &Device.device_info, &Device.device_info_updated)
 			   FROM devices d
 		       LEFT JOIN channels c ON d.channel_uuid = c.uuid COLLATE NOCASE
 			   WHERE d.uuid = $M.uuid`,
@@ -135,5 +137,15 @@ func (store *Store) DeleteDevice(ctx context.Context, uuid uuid.UUID) error {
 			`DELETE FROM devices WHERE uuid = $M.uuid`,
 			sqlair.M{})
 		return tx.Query(stmt, sqlair.M{"uuid": uuid}).Run()
+	})
+}
+
+func (store *Store) UpdateDeviceInfo(ctx context.Context, deviceUUID uuid.UUID, info string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	return store.Update(ctx, func(tx *TX) error {
+		stmt := sqlair.MustPrepare(
+			`UPDATE devices SET device_info = $M.info, device_info_updated = $M.time WHERE uuid = $M.uuid`,
+			sqlair.M{})
+		return tx.Query(stmt, sqlair.M{"uuid": deviceUUID, "info": info, "time": now}).Run()
 	})
 }

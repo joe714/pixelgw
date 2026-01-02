@@ -2,11 +2,13 @@ package pixelclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/joe714/pixelgw/internal/version"
 )
 
 // Client manages a WebSocket connection to a PixelGateway server.
@@ -46,10 +48,30 @@ func (c *Client) Connect(ctx context.Context) error {
 	// Increase read limit for large animated WebP images (default is 32KB)
 	c.conn.SetReadLimit(256 * 1024) // 256KB
 
+	// Send device info
+	if err := c.sendDeviceInfo(ctx); err != nil {
+		// Log but don't fail the connection
+		fmt.Printf("failed to send device info: %v\n", err)
+	}
+
 	// Start the read loop
 	go c.readLoop(ctx)
 
 	return nil
+}
+
+// sendDeviceInfo sends device information to the server.
+func (c *Client) sendDeviceInfo(ctx context.Context) error {
+	info := map[string]string{
+		"device":  "pixelclient",
+		"version": version.Version,
+		"commit":  version.GitCommit,
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	return c.conn.Write(ctx, websocket.MessageText, data)
 }
 
 // readLoop reads messages from the WebSocket connection.

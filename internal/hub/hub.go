@@ -251,6 +251,9 @@ func (h *Hub) wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := NewClient(deviceUUID, conn, host)
+	client.OnDeviceInfo = func(uuid uuid.UUID, info string) error {
+		return h.store.UpdateDeviceInfo(context.Background(), uuid, info)
+	}
 	log.Printf("%v established from %v", client, host)
 	_ = h.register(client, device.ChannelUUID)
 }
