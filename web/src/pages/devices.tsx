@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { makeLoader, useLoaderData } from "react-router-typesafe"
 import { useRevalidator } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Monitor, Wifi, WifiOff, Settings, Plus } from 'lucide-react'
+import { Monitor, Wifi, WifiOff, Settings, Plus, ExternalLink } from 'lucide-react'
 import { restClient } from '@/rest-client'
 import { DeviceConfigModal } from '@/components/DeviceConfigModal'
 import { CreateVirtualDeviceModal } from '@/components/CreateVirtualDeviceModal'
@@ -108,17 +108,32 @@ export function DevicesList() {
                       </div>
                     </div>
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedDevice(device)
-                        setModalOpen(true)
-                      }}
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span className="sr-only">Configure {device.name}</span>
-                    </Button>
+                    <div className="flex gap-1">
+                      {!isOnline && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            window.open(`/display/device/${device.uuid}`, '_blank')
+                          }}
+                          title="Open as virtual display"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          <span className="sr-only">Open {device.name} as virtual display</span>
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedDevice(device)
+                          setModalOpen(true)
+                        }}
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span className="sr-only">Configure {device.name}</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )

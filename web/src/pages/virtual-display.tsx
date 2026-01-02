@@ -7,10 +7,14 @@ import { usePixelWebSocket } from '@/hooks/usePixelWebSocket'
 const NATIVE_WIDTH = 64
 const NATIVE_HEIGHT = 32
 
-// Frame adds padding: p-4 (16px each side) + border (2px each side) + bezel padding (4px each side)
-// Plus LED area (~24px) and branding (~24px) at top/bottom
-const FRAME_PADDING_X = 16 + 2 + 4  // 22px each side = 44px total
-const FRAME_PADDING_Y = 16 + 2 + 4 + 24 + 24  // ~70px total
+// Frame adds to dimensions:
+// - p-4 = 16px padding each side = 32px total horizontal, 32px total vertical
+// - border-2 = 2px each side = 4px total each dimension
+// - p-1 = 4px each side = 8px total each dimension (bezel padding)
+// - LED area: h-2 (8px) + mb-2 (8px) = 16px vertical only
+// - Branding: mt-2 (8px) + text (~12px) = 20px vertical only
+const FRAME_EXTRA_WIDTH = 32 + 4 + 8  // 44px
+const FRAME_EXTRA_HEIGHT = 32 + 4 + 8 + 16 + 20  // 80px
 
 export default function VirtualDisplayPage() {
   const { mode, uuid } = useParams<{ mode: 'channel' | 'device'; uuid: string }>()
@@ -18,17 +22,18 @@ export default function VirtualDisplayPage() {
 
   // Calculate optimal scale to fill viewport
   const calculateScale = useCallback(() => {
-    // Leave some margin around the display
-    const margin = 32
-    const availableWidth = window.innerWidth - margin * 2
-    const availableHeight = window.innerHeight - margin * 2 - 60 // 60px for status bar
+    // Account for page padding (p-4 = 16px each side) and status bar (~50px)
+    const pagePadding = 32
+    const statusBarHeight = 50
+    const availableWidth = window.innerWidth - pagePadding
+    const availableHeight = window.innerHeight - pagePadding - statusBarHeight
 
     // Calculate max scale that fits both dimensions
-    const maxScaleX = Math.floor((availableWidth - FRAME_PADDING_X * 2) / NATIVE_WIDTH)
-    const maxScaleY = Math.floor((availableHeight - FRAME_PADDING_Y) / NATIVE_HEIGHT)
+    const maxScaleX = (availableWidth - FRAME_EXTRA_WIDTH) / NATIVE_WIDTH
+    const maxScaleY = (availableHeight - FRAME_EXTRA_HEIGHT) / NATIVE_HEIGHT
 
-    // Use the smaller of the two, with a minimum of 4 and maximum of 16
-    const optimalScale = Math.max(4, Math.min(16, Math.min(maxScaleX, maxScaleY)))
+    // Use the smaller of the two, floor it, minimum of 4
+    const optimalScale = Math.max(4, Math.floor(Math.min(maxScaleX, maxScaleY)))
     setScale(optimalScale)
   }, [])
 
@@ -56,19 +61,21 @@ export default function VirtualDisplayPage() {
   const { imageUrl, connected, error, reconnect } = usePixelWebSocket(wsUrl)
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-      <PixelDisplay
-        src={imageUrl || ''}
-        scale={scale}
-        showFrame={true}
-        frameTheme="black"
-        powerOn={connected}
-        loading={!imageUrl && !error}
-        error={!!error}
-      />
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-4 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center">
+        <PixelDisplay
+          src={imageUrl || ''}
+          scale={scale}
+          showFrame={true}
+          frameTheme="black"
+          powerOn={connected}
+          loading={!imageUrl && !error}
+          error={!!error}
+        />
+      </div>
 
       {/* Status bar */}
-      <div className="mt-4 text-center">
+      <div className="flex-shrink-0 text-center py-2">
         {error && (
           <div className="text-red-500 text-sm mb-2">
             {error}
