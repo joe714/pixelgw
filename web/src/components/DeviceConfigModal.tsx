@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRevalidator } from 'react-router-dom'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, Eye } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,9 @@ interface DeviceConfigModalProps {
   device: {
     uuid?: string
     name?: string
+    connected?: boolean
+    'current-ip'?: string
+    'last-ip'?: string
     channel?: {
       uuid?: string
       name?: string
@@ -50,6 +53,7 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
   const [loading, setLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [identifying, setIdentifying] = useState(false)
   const revalidator = useRevalidator()
 
   useEffect(() => {
@@ -112,6 +116,37 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
       console.error('Failed to delete device:', error)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleIdentify = async () => {
+    if (!device.uuid) return
+
+    setIdentifying(true)
+    try {
+      const deviceName = device.name || 'Unknown Device'
+      const ipAddress = device['current-ip'] || device['last-ip'] || 'No IP'
+      // Shorten UUID to fit on display (first 8 chars)
+      const shortUuid = device.uuid.slice(0, 8)
+
+      await restClient.POST('/devices/{uuid}/push', {
+        params: { path: { uuid: device.uuid } },
+        body: {
+          applet: 'desk-name-tag',
+          duration: 30,
+          config: {
+            name: deviceName,
+            line_one: ipAddress,
+            line_two: shortUuid,
+            text_color: '#FFFFFF',
+            background_color: '#FF0000',
+          },
+        },
+      })
+    } catch (error) {
+      console.error('Failed to identify device:', error)
+    } finally {
+      setIdentifying(false)
     }
   }
 
@@ -181,14 +216,24 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
             </div>
           </div>
           <DialogFooter className="sm:justify-between">
-            <Button
-              variant="destructive"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="mr-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Device
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Device
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleIdentify}
+                disabled={identifying || !device.connected}
+                title={!device.connected ? 'Device must be connected to identify' : 'Flash device screen for 30 seconds'}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {identifying ? 'Identifying...' : 'Identify'}
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
