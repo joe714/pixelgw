@@ -157,6 +157,40 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// FirmwareSummary defines model for FirmwareSummary.
+type FirmwareSummary struct {
+	// BuildTimestamp Build timestamp (ISO 8601)
+	BuildTimestamp time.Time `json:"build-timestamp"`
+
+	// Description User-provided description
+	Description *string `json:"description,omitempty"`
+
+	// ElfSHA256 SHA256 hash of the ELF file (hex)
+	ElfSHA256 string `json:"elf-sha256"`
+
+	// FileSize Firmware file size in bytes
+	FileSize int64 `json:"file-size"`
+
+	// Filename Original upload filename
+	Filename string `json:"filename"`
+
+	// IDFVersion ESP-IDF version
+	IDFVersion string `json:"idf-version"`
+
+	// IsDefault Whether this is the default firmware for the platform
+	IsDefault bool `json:"is-default"`
+
+	// Platform Target platform (e.g., esp32)
+	Platform string `json:"platform"`
+
+	// UploadedAt Upload timestamp
+	UploadedAt time.Time          `json:"uploaded-at"`
+	UUID       openapi_types.UUID `json:"uuid"`
+
+	// Version Firmware version from binary
+	Version string `json:"version"`
+}
+
 // Location defines model for Location.
 type Location struct {
 	// Description Full location description (e.g. "Brooklyn, NY, USA")
@@ -293,6 +327,12 @@ type PatchDeviceJSONBody struct {
 	Name *string `json:"name,omitempty"`
 }
 
+// TriggerDeviceOTAJSONBody defines parameters for TriggerDeviceOTA.
+type TriggerDeviceOTAJSONBody struct {
+	// FirmwareUUID UUID of the firmware to install
+	FirmwareUUID openapi_types.UUID `json:"firmware_uuid"`
+}
+
 // PushDeviceContentMultipartBody defines parameters for PushDeviceContent.
 type PushDeviceContentMultipartBody struct {
 	// Duration Display duration in seconds (default 15, 0 for indefinite)
@@ -300,6 +340,33 @@ type PushDeviceContentMultipartBody struct {
 
 	// Image WebP image (max 128KB, must be 64x32)
 	Image openapi_types.File `json:"image"`
+}
+
+// GetFirmwaresParams defines parameters for GetFirmwares.
+type GetFirmwaresParams struct {
+	// Platform Filter by platform (e.g., esp32)
+	Platform *string `form:"platform,omitempty" json:"platform,omitempty"`
+}
+
+// UploadFirmwareMultipartBody defines parameters for UploadFirmware.
+type UploadFirmwareMultipartBody struct {
+	// Description Optional description for the firmware
+	Description *string `json:"description,omitempty"`
+
+	// Firmware Firmware binary file (max 2MB)
+	Firmware openapi_types.File `json:"firmware"`
+
+	// IsDefault Set as default firmware for this platform
+	IsDefault *bool `json:"is_default,omitempty"`
+
+	// Platform Target platform (e.g., esp32)
+	Platform string `json:"platform"`
+}
+
+// PatchFirmwareJSONBody defines parameters for PatchFirmware.
+type PatchFirmwareJSONBody struct {
+	// IsDefault Set as default firmware for this platform
+	IsDefault *bool `json:"is_default,omitempty"`
 }
 
 // SearchLocationsParams defines parameters for SearchLocations.
@@ -335,11 +402,20 @@ type CreateDeviceJSONRequestBody CreateDeviceJSONBody
 // PatchDeviceJSONRequestBody defines body for PatchDevice for application/json ContentType.
 type PatchDeviceJSONRequestBody PatchDeviceJSONBody
 
+// TriggerDeviceOTAJSONRequestBody defines body for TriggerDeviceOTA for application/json ContentType.
+type TriggerDeviceOTAJSONRequestBody TriggerDeviceOTAJSONBody
+
 // PushDeviceContentJSONRequestBody defines body for PushDeviceContent for application/json ContentType.
 type PushDeviceContentJSONRequestBody = PushAppletRequest
 
 // PushDeviceContentMultipartRequestBody defines body for PushDeviceContent for multipart/form-data ContentType.
 type PushDeviceContentMultipartRequestBody PushDeviceContentMultipartBody
+
+// UploadFirmwareMultipartRequestBody defines body for UploadFirmware for multipart/form-data ContentType.
+type UploadFirmwareMultipartRequestBody UploadFirmwareMultipartBody
+
+// PatchFirmwareJSONRequestBody defines body for PatchFirmware for application/json ContentType.
+type PatchFirmwareJSONRequestBody PatchFirmwareJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -397,12 +473,30 @@ type ServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Trigger device OTA update
+	// (POST /devices/{uuid}/ota)
+	TriggerDeviceOTA(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
 	// Clear device push override
 	// (DELETE /devices/{uuid}/push)
 	ClearDevicePush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
 	// Push temporary content to device
 	// (POST /devices/{uuid}/push)
 	PushDeviceContent(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// List firmware images
+	// (GET /firmwares)
+	GetFirmwares(w http.ResponseWriter, r *http.Request, params GetFirmwaresParams)
+	// Upload firmware image
+	// (POST /firmwares)
+	UploadFirmware(w http.ResponseWriter, r *http.Request)
+	// Delete firmware image
+	// (DELETE /firmwares/{uuid})
+	DeleteFirmware(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Get firmware details
+	// (GET /firmwares/{uuid})
+	GetFirmwareByUUID(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
+	// Update firmware metadata
+	// (PATCH /firmwares/{uuid})
+	PatchFirmware(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID)
 	// Search locations
 	// (GET /locations)
 	SearchLocations(w http.ResponseWriter, r *http.Request, params SearchLocationsParams)
@@ -884,6 +978,31 @@ func (siw *ServerInterfaceWrapper) PatchDevice(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// TriggerDeviceOTA operation middleware
+func (siw *ServerInterfaceWrapper) TriggerDeviceOTA(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriggerDeviceOTA(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ClearDevicePush operation middleware
 func (siw *ServerInterfaceWrapper) ClearDevicePush(w http.ResponseWriter, r *http.Request) {
 
@@ -925,6 +1044,122 @@ func (siw *ServerInterfaceWrapper) PushDeviceContent(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PushDeviceContent(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFirmwares operation middleware
+func (siw *ServerInterfaceWrapper) GetFirmwares(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFirmwaresParams
+
+	// ------------- Optional query parameter "platform" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "platform", r.URL.Query(), &params.Platform)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "platform", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFirmwares(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadFirmware operation middleware
+func (siw *ServerInterfaceWrapper) UploadFirmware(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadFirmware(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFirmware operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFirmware(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFirmware(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFirmwareByUUID operation middleware
+func (siw *ServerInterfaceWrapper) GetFirmwareByUUID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFirmwareByUUID(w, r, uuid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchFirmware operation middleware
+func (siw *ServerInterfaceWrapper) PatchFirmware(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "uuid" -------------
+	var uuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "uuid", r.PathValue("uuid"), &uuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "uuid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchFirmware(w, r, uuid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1153,8 +1388,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/devices/{uuid}", wrapper.DeleteDevice)
 	m.HandleFunc("GET "+options.BaseURL+"/devices/{uuid}", wrapper.GetDeviceByUUID)
 	m.HandleFunc("PATCH "+options.BaseURL+"/devices/{uuid}", wrapper.PatchDevice)
+	m.HandleFunc("POST "+options.BaseURL+"/devices/{uuid}/ota", wrapper.TriggerDeviceOTA)
 	m.HandleFunc("DELETE "+options.BaseURL+"/devices/{uuid}/push", wrapper.ClearDevicePush)
 	m.HandleFunc("POST "+options.BaseURL+"/devices/{uuid}/push", wrapper.PushDeviceContent)
+	m.HandleFunc("GET "+options.BaseURL+"/firmwares", wrapper.GetFirmwares)
+	m.HandleFunc("POST "+options.BaseURL+"/firmwares", wrapper.UploadFirmware)
+	m.HandleFunc("DELETE "+options.BaseURL+"/firmwares/{uuid}", wrapper.DeleteFirmware)
+	m.HandleFunc("GET "+options.BaseURL+"/firmwares/{uuid}", wrapper.GetFirmwareByUUID)
+	m.HandleFunc("PATCH "+options.BaseURL+"/firmwares/{uuid}", wrapper.PatchFirmware)
 	m.HandleFunc("GET "+options.BaseURL+"/locations", wrapper.SearchLocations)
 	m.HandleFunc("GET "+options.BaseURL+"/locations/{placeId}", wrapper.GetLocationByPlaceID)
 	m.HandleFunc("GET "+options.BaseURL+"/sessions", wrapper.GetSessions)
@@ -1797,6 +2038,57 @@ func (response PatchDevicedefaultJSONResponse) VisitPatchDeviceResponse(w http.R
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type TriggerDeviceOTARequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+	Body *TriggerDeviceOTAJSONRequestBody
+}
+
+type TriggerDeviceOTAResponseObject interface {
+	VisitTriggerDeviceOTAResponse(w http.ResponseWriter) error
+}
+
+type TriggerDeviceOTA200JSONResponse struct {
+	// Path Download path sent to device
+	Path *string `json:"path,omitempty"`
+}
+
+func (response TriggerDeviceOTA200JSONResponse) VisitTriggerDeviceOTAResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TriggerDeviceOTA404JSONResponse Error
+
+func (response TriggerDeviceOTA404JSONResponse) VisitTriggerDeviceOTAResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TriggerDeviceOTA409JSONResponse Error
+
+func (response TriggerDeviceOTA409JSONResponse) VisitTriggerDeviceOTAResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TriggerDeviceOTAdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TriggerDeviceOTAdefaultJSONResponse) VisitTriggerDeviceOTAResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type ClearDevicePushRequestObject struct {
 	UUID openapi_types.UUID `json:"uuid"`
 }
@@ -1894,6 +2186,196 @@ type PushDeviceContentdefaultJSONResponse struct {
 }
 
 func (response PushDeviceContentdefaultJSONResponse) VisitPushDeviceContentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetFirmwaresRequestObject struct {
+	Params GetFirmwaresParams
+}
+
+type GetFirmwaresResponseObject interface {
+	VisitGetFirmwaresResponse(w http.ResponseWriter) error
+}
+
+type GetFirmwares200JSONResponse []FirmwareSummary
+
+func (response GetFirmwares200JSONResponse) VisitGetFirmwaresResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetFirmwaresdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetFirmwaresdefaultJSONResponse) VisitGetFirmwaresResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type UploadFirmwareRequestObject struct {
+	Body *multipart.Reader
+}
+
+type UploadFirmwareResponseObject interface {
+	VisitUploadFirmwareResponse(w http.ResponseWriter) error
+}
+
+type UploadFirmware201JSONResponse FirmwareSummary
+
+func (response UploadFirmware201JSONResponse) VisitUploadFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadFirmware400JSONResponse Error
+
+func (response UploadFirmware400JSONResponse) VisitUploadFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadFirmware409JSONResponse Error
+
+func (response UploadFirmware409JSONResponse) VisitUploadFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadFirmwaredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UploadFirmwaredefaultJSONResponse) VisitUploadFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type DeleteFirmwareRequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+}
+
+type DeleteFirmwareResponseObject interface {
+	VisitDeleteFirmwareResponse(w http.ResponseWriter) error
+}
+
+type DeleteFirmware204Response struct {
+}
+
+func (response DeleteFirmware204Response) VisitDeleteFirmwareResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteFirmware404JSONResponse Error
+
+func (response DeleteFirmware404JSONResponse) VisitDeleteFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteFirmwaredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DeleteFirmwaredefaultJSONResponse) VisitDeleteFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type GetFirmwareByUUIDRequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+}
+
+type GetFirmwareByUUIDResponseObject interface {
+	VisitGetFirmwareByUUIDResponse(w http.ResponseWriter) error
+}
+
+type GetFirmwareByUUID200JSONResponse FirmwareSummary
+
+func (response GetFirmwareByUUID200JSONResponse) VisitGetFirmwareByUUIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetFirmwareByUUID404JSONResponse Error
+
+func (response GetFirmwareByUUID404JSONResponse) VisitGetFirmwareByUUIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetFirmwareByUUIDdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetFirmwareByUUIDdefaultJSONResponse) VisitGetFirmwareByUUIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type PatchFirmwareRequestObject struct {
+	UUID openapi_types.UUID `json:"uuid"`
+	Body *PatchFirmwareJSONRequestBody
+}
+
+type PatchFirmwareResponseObject interface {
+	VisitPatchFirmwareResponse(w http.ResponseWriter) error
+}
+
+type PatchFirmware200JSONResponse FirmwareSummary
+
+func (response PatchFirmware200JSONResponse) VisitPatchFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchFirmware404JSONResponse Error
+
+func (response PatchFirmware404JSONResponse) VisitPatchFirmwareResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchFirmwaredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PatchFirmwaredefaultJSONResponse) VisitPatchFirmwareResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -2051,12 +2533,30 @@ type StrictServerInterface interface {
 
 	// (PATCH /devices/{uuid})
 	PatchDevice(ctx context.Context, request PatchDeviceRequestObject) (PatchDeviceResponseObject, error)
+	// Trigger device OTA update
+	// (POST /devices/{uuid}/ota)
+	TriggerDeviceOTA(ctx context.Context, request TriggerDeviceOTARequestObject) (TriggerDeviceOTAResponseObject, error)
 	// Clear device push override
 	// (DELETE /devices/{uuid}/push)
 	ClearDevicePush(ctx context.Context, request ClearDevicePushRequestObject) (ClearDevicePushResponseObject, error)
 	// Push temporary content to device
 	// (POST /devices/{uuid}/push)
 	PushDeviceContent(ctx context.Context, request PushDeviceContentRequestObject) (PushDeviceContentResponseObject, error)
+	// List firmware images
+	// (GET /firmwares)
+	GetFirmwares(ctx context.Context, request GetFirmwaresRequestObject) (GetFirmwaresResponseObject, error)
+	// Upload firmware image
+	// (POST /firmwares)
+	UploadFirmware(ctx context.Context, request UploadFirmwareRequestObject) (UploadFirmwareResponseObject, error)
+	// Delete firmware image
+	// (DELETE /firmwares/{uuid})
+	DeleteFirmware(ctx context.Context, request DeleteFirmwareRequestObject) (DeleteFirmwareResponseObject, error)
+	// Get firmware details
+	// (GET /firmwares/{uuid})
+	GetFirmwareByUUID(ctx context.Context, request GetFirmwareByUUIDRequestObject) (GetFirmwareByUUIDResponseObject, error)
+	// Update firmware metadata
+	// (PATCH /firmwares/{uuid})
+	PatchFirmware(ctx context.Context, request PatchFirmwareRequestObject) (PatchFirmwareResponseObject, error)
 	// Search locations
 	// (GET /locations)
 	SearchLocations(ctx context.Context, request SearchLocationsRequestObject) (SearchLocationsResponseObject, error)
@@ -2622,6 +3122,39 @@ func (sh *strictHandler) PatchDevice(w http.ResponseWriter, r *http.Request, uui
 	}
 }
 
+// TriggerDeviceOTA operation middleware
+func (sh *strictHandler) TriggerDeviceOTA(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request TriggerDeviceOTARequestObject
+
+	request.UUID = uuid
+
+	var body TriggerDeviceOTAJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TriggerDeviceOTA(ctx, request.(TriggerDeviceOTARequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TriggerDeviceOTA")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TriggerDeviceOTAResponseObject); ok {
+		if err := validResponse.VisitTriggerDeviceOTAResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ClearDevicePush operation middleware
 func (sh *strictHandler) ClearDevicePush(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
 	var request ClearDevicePushRequestObject
@@ -2684,6 +3217,148 @@ func (sh *strictHandler) PushDeviceContent(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PushDeviceContentResponseObject); ok {
 		if err := validResponse.VisitPushDeviceContentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFirmwares operation middleware
+func (sh *strictHandler) GetFirmwares(w http.ResponseWriter, r *http.Request, params GetFirmwaresParams) {
+	var request GetFirmwaresRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFirmwares(ctx, request.(GetFirmwaresRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFirmwares")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFirmwaresResponseObject); ok {
+		if err := validResponse.VisitGetFirmwaresResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadFirmware operation middleware
+func (sh *strictHandler) UploadFirmware(w http.ResponseWriter, r *http.Request) {
+	var request UploadFirmwareRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadFirmware(ctx, request.(UploadFirmwareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadFirmware")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadFirmwareResponseObject); ok {
+		if err := validResponse.VisitUploadFirmwareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFirmware operation middleware
+func (sh *strictHandler) DeleteFirmware(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request DeleteFirmwareRequestObject
+
+	request.UUID = uuid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFirmware(ctx, request.(DeleteFirmwareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFirmware")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFirmwareResponseObject); ok {
+		if err := validResponse.VisitDeleteFirmwareResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFirmwareByUUID operation middleware
+func (sh *strictHandler) GetFirmwareByUUID(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request GetFirmwareByUUIDRequestObject
+
+	request.UUID = uuid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFirmwareByUUID(ctx, request.(GetFirmwareByUUIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFirmwareByUUID")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFirmwareByUUIDResponseObject); ok {
+		if err := validResponse.VisitGetFirmwareByUUIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchFirmware operation middleware
+func (sh *strictHandler) PatchFirmware(w http.ResponseWriter, r *http.Request, uuid openapi_types.UUID) {
+	var request PatchFirmwareRequestObject
+
+	request.UUID = uuid
+
+	var body PatchFirmwareJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchFirmware(ctx, request.(PatchFirmwareRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchFirmware")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchFirmwareResponseObject); ok {
+		if err := validResponse.VisitPatchFirmwareResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2770,60 +3445,73 @@ func (sh *strictHandler) GetSessions(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

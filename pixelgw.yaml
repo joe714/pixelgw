@@ -666,7 +666,221 @@ paths:
                type: array
                items:
                  $ref: '#/components/schemas/SessionSummary'
-        default: 
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /firmwares:
+    get:
+      summary: List firmware images
+      description: Returns all firmware images, optionally filtered by platform
+      operationId: getFirmwares
+      parameters:
+        - name: platform
+          in: query
+          description: Filter by platform (e.g., esp32)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Firmware list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FirmwareSummary'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    post:
+      summary: Upload firmware image
+      description: Upload a new firmware binary with metadata extraction
+      operationId: uploadFirmware
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - platform
+                - firmware
+              properties:
+                platform:
+                  type: string
+                  description: Target platform (e.g., esp32)
+                description:
+                  type: string
+                  description: Optional description for the firmware
+                is_default:
+                  type: boolean
+                  description: Set as default firmware for this platform
+                firmware:
+                  type: string
+                  format: binary
+                  description: Firmware binary file (max 2MB)
+      responses:
+        '201':
+          description: Firmware uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareSummary'
+        '400':
+          description: Invalid firmware binary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Duplicate firmware already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /firmwares/{uuid}:
+    get:
+      summary: Get firmware details
+      description: Get details of a specific firmware image
+      operationId: getFirmwareByUUID
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the firmware
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '200':
+          description: Firmware details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareSummary'
+        '404':
+          description: Firmware not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    delete:
+      summary: Delete firmware image
+      description: Delete a firmware image and its binary
+      operationId: deleteFirmware
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the firmware
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      responses:
+        '204':
+          description: Firmware deleted successfully
+        '404':
+          description: Firmware not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+    patch:
+      summary: Update firmware metadata
+      description: Update firmware metadata (currently only is_default)
+      operationId: patchFirmware
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the firmware
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_default:
+                  type: boolean
+                  description: Set as default firmware for this platform
+      responses:
+        '200':
+          description: Firmware updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirmwareSummary'
+        '404':
+          description: Firmware not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/DefaultErrorResponse'
+  /devices/{uuid}/ota:
+    post:
+      summary: Trigger device OTA update
+      description: Send OTA update command to a connected device
+      operationId: triggerDeviceOTA
+      parameters:
+        - name: uuid
+          in: path
+          description: UUID of the device
+          required: true
+          schema:
+            type: string
+            format: uuid
+          x-go-name: UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - firmware_uuid
+              properties:
+                firmware_uuid:
+                  type: string
+                  format: uuid
+                  description: UUID of the firmware to install
+                  x-go-name: FirmwareUUID
+      responses:
+        '200':
+          description: OTA command sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Download path sent to device
+        '404':
+          description: Device or firmware not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Device is offline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
           $ref: '#/components/responses/DefaultErrorResponse'
 components:
   schemas:
@@ -991,6 +1205,63 @@ components:
         message:
           type: string
           description: Error message
+    FirmwareSummary:
+      type: object
+      required:
+        - uuid
+        - platform
+        - filename
+        - version
+        - build-timestamp
+        - elf-sha256
+        - idf-version
+        - file-size
+        - is-default
+        - uploaded-at
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          x-go-name: UUID
+        platform:
+          type: string
+          description: Target platform (e.g., esp32)
+        filename:
+          type: string
+          description: Original upload filename
+        description:
+          type: string
+          description: User-provided description
+        version:
+          type: string
+          description: Firmware version from binary
+        build-timestamp:
+          type: string
+          format: date-time
+          description: Build timestamp (ISO 8601)
+          x-go-name: BuildTimestamp
+        elf-sha256:
+          type: string
+          description: SHA256 hash of the ELF file (hex)
+          x-go-name: ElfSHA256
+        idf-version:
+          type: string
+          description: ESP-IDF version
+          x-go-name: IDFVersion
+        file-size:
+          type: integer
+          format: int64
+          description: Firmware file size in bytes
+          x-go-name: FileSize
+        is-default:
+          type: boolean
+          description: Whether this is the default firmware for the platform
+          x-go-name: IsDefault
+        uploaded-at:
+          type: string
+          format: date-time
+          description: Upload timestamp
+          x-go-name: UploadedAt
   responses:
     DefaultErrorResponse:
       description: Unknown error

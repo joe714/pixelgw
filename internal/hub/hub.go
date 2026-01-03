@@ -482,3 +482,15 @@ func (h *Hub) IsDeviceConnected(deviceUUID uuid.UUID) bool {
 	})
 	return connected
 }
+
+// SendOTACommand sends an OTA update command to a specific device
+func (h *Hub) SendOTACommand(deviceUUID uuid.UUID, downloadPath string) error {
+	return RunTask(h.tasks, func() error {
+		client, _ := h.findClientByDevice(deviceUUID)
+		if client == nil {
+			return ne.DeviceNotConnected
+		}
+
+		return client.SendOTACommand(downloadPath)
+	})
+}

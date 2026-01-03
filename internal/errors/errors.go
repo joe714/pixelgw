@@ -67,5 +67,7 @@ var (
 	ChannelNotFound    = New(1002, "channel not found")
 	DeviceNotFound     = New(1003, "device not found")
 	DeviceNotConnected = New(1004, "device not connected")
+	FirmwareNotFound   = New(1005, "firmware not found")
+	FirmwareDuplicate  = New(1006, "firmware with same SHA256 already exists for this platform")
 	AppIndexOutOfRange = New(1011, "index out of range")
 )

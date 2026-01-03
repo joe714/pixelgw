@@ -7,6 +7,7 @@ import { ChannelList, channelListLoader } from "@/pages/channel-list"
 import { ChannelDetail, channelDetailLoader } from "@/pages/channel-detail"
 import { DevicesList, devicesLoader } from "@/pages/devices"
 import { AppletsList, appletsLoader } from "@/pages/applets"
+import { FirmwaresList, firmwaresLoader } from "@/pages/firmwares"
 import { PixelDisplayDebug } from "@/pages/pixel-display-debug"
 import VirtualDisplayPage from "@/pages/virtual-display"
 
@@ -37,6 +38,11 @@ const router = createBrowserRouter([
         path: "devices",
         element: <DevicesList />,
         loader: devicesLoader,
+      },
+      {
+        path: "firmwares",
+        element: <FirmwaresList />,
+        loader: firmwaresLoader,
       },
       {
         path: "applets",

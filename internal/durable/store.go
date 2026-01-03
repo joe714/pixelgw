@@ -86,6 +86,14 @@ func NewStore() (*Store, error) {
 		log.Printf("Migrated to schema version: %v\n", v.Version)
 	}
 
+	if v.Version < 4 {
+		v, err = store.migrateToV4()
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("Migrated to schema version: %v\n", v.Version)
+	}
+
 	return &store, nil
 }
 
@@ -140,6 +148,21 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 			device_info_updated TEXT
 			)`,
 		`CREATE INDEX idx_channel_devices ON devices (channel_uuid, uuid)`,
+		`CREATE TABLE firmwares (
+			uuid TEXT PRIMARY KEY COLLATE NOCASE,
+			platform TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			description TEXT,
+			version TEXT NOT NULL,
+			build_timestamp TEXT NOT NULL,
+			elf_sha256 TEXT NOT NULL,
+			idf_version TEXT NOT NULL,
+			file_size INTEGER NOT NULL,
+			is_default BOOLEAN DEFAULT FALSE,
+			uploaded_at TEXT NOT NULL,
+			UNIQUE (platform, elf_sha256)
+		)`,
+		`CREATE INDEX idx_firmwares_platform ON firmwares (platform, is_default)`,
 		`INSERT INTO channels VALUES ('76ffcb18-d3c7-40d5-abea-3fe86d02a4ba', 'default', 'The default channel')`,
 		`INSERT INTO channel_applets VALUES ('efe35cfa-4076-4e84-9c9c-961e821769bd',
                                              '76ffcb18-d3c7-40d5-abea-3fe86d02a4ba',
@@ -151,7 +174,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
                                              1,
                                              'dvd-logo',
                                              NULL)`,
-		`INSERT INTO schema_version VALUES(3);`,
+		`INSERT INTO schema_version VALUES(4);`,
 	}
 	log.Println("Perform initial database setup")
 
@@ -169,7 +192,7 @@ func (store *Store) initSchema() (SchemaVersion, error) {
 		return nil
 	})
 
-	return SchemaVersion{Version: 3}, err
+	return SchemaVersion{Version: 4}, err
 }
 
 func (store *Store) migrateToV2() (SchemaVersion, error) {
@@ -219,4 +242,41 @@ func (store *Store) migrateToV3() (SchemaVersion, error) {
 	})
 
 	return SchemaVersion{Version: 3}, err
+}
+
+func (store *Store) migrateToV4() (SchemaVersion, error) {
+	stmts := []string{
+		`CREATE TABLE firmwares (
+			uuid TEXT PRIMARY KEY COLLATE NOCASE,
+			platform TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			description TEXT,
+			version TEXT NOT NULL,
+			build_timestamp TEXT NOT NULL,
+			elf_sha256 TEXT NOT NULL,
+			idf_version TEXT NOT NULL,
+			file_size INTEGER NOT NULL,
+			is_default BOOLEAN DEFAULT FALSE,
+			uploaded_at TEXT NOT NULL,
+			UNIQUE (platform, elf_sha256)
+		)`,
+		`CREATE INDEX idx_firmwares_platform ON firmwares (platform, is_default)`,
+		`INSERT INTO schema_version VALUES(4);`,
+	}
+	log.Println("Migrating database to version 4")
+
+	err := store.Update(context.Background(), func(tx *TX) error {
+		for _, s := range stmts {
+			log.Println(s)
+			stmt := sqlair.MustPrepare(s)
+			err := tx.Query(stmt).Run()
+			if err != nil {
+				log.Printf("Migration error: %v", err)
+				return err
+			}
+		}
+		return nil
+	})
+
+	return SchemaVersion{Version: 4}, err
 }

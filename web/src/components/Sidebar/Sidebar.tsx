@@ -1,9 +1,10 @@
-import { Grid, Monitor } from 'lucide-react'
+import { Grid, Monitor, HardDrive } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
 
 const navItems = [
   { label: 'Channels', path: '/', icon: Grid },
   { label: 'Devices', path: '/devices', icon: Monitor },
+  { label: 'Firmwares', path: '/firmwares', icon: HardDrive },
 ]
 
 export function Sidebar() {

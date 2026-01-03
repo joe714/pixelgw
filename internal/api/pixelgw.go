@@ -14,6 +14,7 @@ import (
 
 	"github.com/joe714/pixelgw/internal/durable"
 	"github.com/joe714/pixelgw/internal/errors"
+	"github.com/joe714/pixelgw/internal/firmware"
 	"github.com/joe714/pixelgw/internal/hub"
 )
 
@@ -27,15 +28,28 @@ var statusCodes = map[error]int{
 	errors.ChannelExists:      http.StatusConflict,
 	errors.ChannelNotFound:    http.StatusNotFound,
 	errors.AppIndexOutOfRange: http.StatusBadRequest,
+	errors.FirmwareNotFound:   http.StatusNotFound,
+	errors.FirmwareDuplicate:  http.StatusConflict,
+	errors.DeviceNotConnected: http.StatusConflict,
 }
 
 type Server struct {
-	hub   *hub.Hub
-	store *durable.Store
+	hub        *hub.Hub
+	store      *durable.Store
+	tokenStore *firmware.TokenStore
 }
 
 func NewServer(hub *hub.Hub, store *durable.Store) *Server {
-	return &Server{hub: hub, store: store}
+	return &Server{
+		hub:        hub,
+		store:      store,
+		tokenStore: firmware.NewTokenStore(),
+	}
+}
+
+// GetTokenStore returns the token store for firmware downloads
+func (s *Server) GetTokenStore() *firmware.TokenStore {
+	return s.tokenStore
 }
 
 func RenderError(err error) Error {

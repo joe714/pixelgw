@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRevalidator } from 'react-router-dom'
-import { Copy, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react'
+import { Copy, Trash2, Eye, ChevronDown, ChevronRight, RefreshCw, Star } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,20 @@ import {
 } from '@/components/ui/select'
 import { restClient } from '@/rest-client'
 
+type FirmwareSummary = {
+  uuid: string
+  platform: string
+  filename: string
+  description?: string
+  version: string
+  'build-timestamp': string
+  'elf-sha256': string
+  'idf-version': string
+  'file-size': number
+  'is-default': boolean
+  'uploaded-at': string
+}
+
 interface DeviceConfigModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -57,6 +71,10 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
   const [deviceInfo, setDeviceInfo] = useState<Record<string, unknown> | null>(null)
   const [deviceInfoUpdated, setDeviceInfoUpdated] = useState<string | null>(null)
   const [showDeviceInfo, setShowDeviceInfo] = useState(false)
+  const [showFirmwareUpdate, setShowFirmwareUpdate] = useState(false)
+  const [firmwares, setFirmwares] = useState<FirmwareSummary[]>([])
+  const [selectedFirmwareUuid, setSelectedFirmwareUuid] = useState<string>('')
+  const [updating, setUpdating] = useState(false)
   const revalidator = useRevalidator()
 
   useEffect(() => {
@@ -80,12 +98,22 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
           setDeviceInfoUpdated(deviceResponse.data['device-info-updated'] ?? null)
         }
       }
+
+      // Fetch firmwares for esp32 platform
+      const firmwaresResponse = await restClient.GET('/firmwares', {
+        params: { query: { platform: 'esp32' } }
+      })
+      if (firmwaresResponse.data) {
+        setFirmwares(firmwaresResponse.data as FirmwareSummary[])
+      }
     }
     if (open) {
       fetchData()
       setName(device.name || '')
       setSelectedChannelUuid(device.channel?.uuid || '')
       setShowDeviceInfo(false)
+      setShowFirmwareUpdate(false)
+      setSelectedFirmwareUuid('')
     }
   }, [open, device])
 
@@ -168,6 +196,33 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
       setIdentifying(false)
     }
   }
+
+  const handleFirmwareUpdate = async () => {
+    if (!device.uuid || !selectedFirmwareUuid) return
+
+    setUpdating(true)
+    try {
+      await restClient.POST('/devices/{uuid}/ota', {
+        params: { path: { uuid: device.uuid } },
+        body: { firmware_uuid: selectedFirmwareUuid }
+      })
+      // Close the section after triggering update
+      setShowFirmwareUpdate(false)
+      setSelectedFirmwareUuid('')
+    } catch (error) {
+      console.error('Failed to trigger firmware update:', error)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // Get current device firmware SHA256 from device info
+  const currentFirmwareSHA = deviceInfo?.sha256 as string | undefined
+
+  // Find if current firmware matches any known firmware
+  const currentFirmware = currentFirmwareSHA
+    ? firmwares.find(fw => fw['elf-sha256'] === currentFirmwareSHA)
+    : undefined
 
   return (
     <>
@@ -264,6 +319,71 @@ export function DeviceConfigModal({ open, onOpenChange, device }: DeviceConfigMo
                         </div>
                       )
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Firmware Update Section */}
+            {device.connected && firmwares.length > 0 && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="flex items-center text-sm font-medium text-slate-400 hover:text-slate-300"
+                  onClick={() => setShowFirmwareUpdate(!showFirmwareUpdate)}
+                >
+                  {showFirmwareUpdate ? (
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                  )}
+                  Firmware Update
+                </button>
+                {showFirmwareUpdate && (
+                  <div className="mt-2 pl-5 space-y-3">
+                    <div className="text-sm">
+                      <span className="text-slate-500">Current: </span>
+                      <span className="text-slate-300">
+                        {currentFirmware
+                          ? `${currentFirmware.version} (${new Date(currentFirmware['build-timestamp']).toLocaleDateString()})`
+                          : deviceInfo?.version
+                            ? String(deviceInfo.version)
+                            : 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={selectedFirmwareUuid} onValueChange={setSelectedFirmwareUuid}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select firmware..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {firmwares.map((fw) => (
+                            <SelectItem key={fw.uuid} value={fw.uuid}>
+                              <div className="flex items-center gap-2">
+                                <span>{fw.version}</span>
+                                <span className="text-slate-500 text-xs">
+                                  ({new Date(fw['build-timestamp']).toLocaleDateString()})
+                                </span>
+                                {fw['is-default'] && (
+                                  <Star className="h-3 w-3 text-amber-500" />
+                                )}
+                                {currentFirmwareSHA === fw['elf-sha256'] && (
+                                  <span className="text-xs text-slate-500">current</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleFirmwareUpdate}
+                      disabled={!selectedFirmwareUuid || updating || !device.connected}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${updating ? 'animate-spin' : ''}`} />
+                      {updating ? 'Updating...' : 'Update Firmware'}
+                    </Button>
                   </div>
                 )}
               </div>

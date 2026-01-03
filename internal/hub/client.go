@@ -108,32 +108,61 @@ func (c *Client) readPump() {
 			break
 		}
 
-		// Process text messages as potential device info
+		// Process text messages (device info, ACKs, commands)
 		if messageType == websocket.TextMessage {
-			c.handleDeviceInfo(message)
+			c.handleTextMessage(message)
 		}
 	}
 }
 
-func (c *Client) handleDeviceInfo(message []byte) {
+func (c *Client) handleTextMessage(message []byte) {
 	if len(message) > maxDeviceInfoSize {
-		log.Printf("%v device info too large (%d bytes), dropping", c, len(message))
+		log.Printf("%v message too large (%d bytes), dropping", c, len(message))
 		return
 	}
 
-	var info map[string]interface{}
-	if err := json.Unmarshal(message, &info); err != nil {
-		log.Printf("%v device info invalid JSON: %v", c, err)
+	var msg map[string]interface{}
+	if err := json.Unmarshal(message, &msg); err != nil {
+		log.Printf("%v invalid JSON: %v", c, err)
 		return
 	}
 
-	if _, hasDevice := info["device"]; !hasDevice {
-		log.Printf("%v device info missing 'device' field, ignoring", c)
+	// Check for ACK message
+	if ack, hasAck := msg["ack"]; hasAck {
+		log.Printf("%v received ACK: %v", c, ack)
 		return
 	}
 
+	// Check for cmd field (new format)
+	if cmd, hasCmd := msg["cmd"]; hasCmd {
+		switch cmd {
+		case "device-info":
+			// Remove cmd field before storing
+			delete(msg, "cmd")
+			data, err := json.Marshal(msg)
+			if err != nil {
+				log.Printf("%v failed to re-marshal device info: %v", c, err)
+				return
+			}
+			c.storeDeviceInfo(data)
+		default:
+			log.Printf("%v received unknown command: %v", c, cmd)
+		}
+		return
+	}
+
+	// Legacy format: check for device field (backward compatibility)
+	if _, hasDevice := msg["device"]; hasDevice {
+		c.storeDeviceInfo(message)
+		return
+	}
+
+	log.Printf("%v received unrecognized message format", c)
+}
+
+func (c *Client) storeDeviceInfo(data []byte) {
 	if c.OnDeviceInfo != nil {
-		if err := c.OnDeviceInfo(c.UUID, string(message)); err != nil {
+		if err := c.OnDeviceInfo(c.UUID, string(data)); err != nil {
 			log.Printf("%v failed to store device info: %v", c, err)
 		} else {
 			log.Printf("%v device info updated", c)
@@ -188,4 +217,26 @@ func (c *Client) write(data []byte) error {
 
 func (c *Client) String() string {
 	return fmt.Sprintf("[%d %v]", c.SessionID, c.UUID)
+}
+
+// SendOTACommand sends an OTA update command to the device
+func (c *Client) SendOTACommand(downloadPath string) error {
+	// Build JSON command: {"cmd": "ota", "path": "/firmware/abc123"}
+	cmd := map[string]string{
+		"cmd":  "ota",
+		"path": downloadPath,
+	}
+	data, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	err = c.conn.WriteMessage(websocket.TextMessage, data)
+	if err != nil {
+		log.Printf("%v failed to send OTA command: %v", c, err)
+		return err
+	}
+	log.Printf("%v sent OTA command: %s", c, downloadPath)
+	return nil
 }
