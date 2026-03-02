@@ -45,12 +45,18 @@ export function EditAppletModal({ open, onOpenChange, channelUuid, applet }: Edi
   useEffect(() => {
     if (!open || !applet) return
 
-    // Parse existing config immediately
+    // Parse existing config - API returns config as an inline JSON object
     let existingConfig: Record<string, string> = {}
-    try {
-      existingConfig = applet.config ? JSON.parse(applet.config) : {}
-    } catch {
-      existingConfig = {}
+    if (applet.config) {
+      if (typeof applet.config === 'object') {
+        existingConfig = applet.config as unknown as Record<string, string>
+      } else if (typeof applet.config === 'string') {
+        try {
+          existingConfig = JSON.parse(applet.config)
+        } catch {
+          existingConfig = {}
+        }
+      }
     }
     setConfig(existingConfig)
 
