@@ -1,0 +1,8 @@
+---
+id: hass-evse
+name: HASS EVSE
+summary: Home Assistant EVSE charge session
+desc: Shows the current EV charge session from a Home Assistant EVSE.
+author: Joe Sunday
+fileName: hass_evse.star
+packageName: hassevse
